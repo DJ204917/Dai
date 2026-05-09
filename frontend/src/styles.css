@@ -1,0 +1,565 @@
+:root {
+  color: #172326;
+  background: #f5f7f4;
+  font-family: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px clamp(18px, 4vw, 52px);
+  background: rgba(245, 247, 244, 0.92);
+  border-bottom: 1px solid #dce5dd;
+  backdrop-filter: blur(16px);
+}
+
+.brand,
+.main-nav a,
+.hotline,
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.brand {
+  color: #102327;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #ffffff;
+  background: #0a7772;
+  border-radius: 8px;
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.main-nav a {
+  min-height: 38px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  color: #4a5a5d;
+  white-space: nowrap;
+}
+
+.main-nav a.active {
+  color: #0a514f;
+  background: #dcefeb;
+}
+
+.hotline {
+  color: #0f5b58;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+main {
+  flex: 1;
+}
+
+.page {
+  width: min(1160px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 34px 0 48px;
+}
+
+.compact-page {
+  padding-top: 28px;
+}
+
+.hero {
+  min-height: 460px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: end;
+  gap: 32px;
+  padding: clamp(28px, 6vw, 64px);
+  color: #ffffff;
+  background:
+    linear-gradient(100deg, rgba(7, 64, 66, 0.92), rgba(9, 94, 91, 0.72)),
+    url("https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=1600&q=80");
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+}
+
+.hero h1,
+.section-heading h1,
+.section-heading h2,
+.two-column h2 {
+  margin: 0;
+  line-height: 1.08;
+}
+
+.hero h1 {
+  font-size: clamp(44px, 7vw, 82px);
+  letter-spacing: 0;
+}
+
+.hero p {
+  max-width: 660px;
+  font-size: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #0a7772;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.hero .eyebrow {
+  color: #b9fff3;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.primary-button,
+.secondary-button,
+button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primary-button {
+  justify-content: center;
+  padding: 11px 16px;
+  color: #ffffff;
+  background: #0a7772;
+  font-weight: 800;
+}
+
+.secondary-button {
+  padding: 11px 16px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+}
+
+.hero-panel,
+.panel,
+.summary-panel,
+.card,
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #dfe8e0;
+  border-radius: 8px;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  color: #172326;
+}
+
+.hero-panel div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-panel strong {
+  color: #0a7772;
+  font-size: 26px;
+}
+
+.feature-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 42px;
+}
+
+.feature-strip div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 14px;
+  background: #e7f0e4;
+  border-radius: 8px;
+  color: #223436;
+  font-weight: 700;
+}
+
+.section-grid,
+.two-column {
+  margin-top: 42px;
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.section-heading h1,
+.section-heading h2,
+.two-column h2 {
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+.card-grid,
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 20px;
+}
+
+.card h2,
+.card h3,
+.panel h2,
+.summary-panel h2 {
+  margin: 0 0 10px;
+}
+
+.card p {
+  min-height: 54px;
+  color: #526164;
+}
+
+.card strong {
+  color: #0a7772;
+}
+
+.two-column,
+.booking-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.booking-layout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 320px;
+  align-items: start;
+}
+
+.panel,
+.summary-panel {
+  padding: 20px;
+}
+
+.list-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.list-row,
+.price-line,
+.table-head,
+.table-row {
+  display: grid;
+  align-items: center;
+}
+
+.list-row {
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dfe8e0;
+  border-radius: 8px;
+}
+
+.list-row span,
+.summary-panel small,
+.card p {
+  display: block;
+  color: #607073;
+}
+
+.segmented,
+.rental-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.segmented {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmented button,
+.rental,
+.admin-modules button,
+.table-row button {
+  padding: 10px 12px;
+  color: #273638;
+  background: #edf3ed;
+  border: 1px solid #d7e3d9;
+}
+
+.segmented button.selected,
+.rental.selected {
+  color: #ffffff;
+  background: #0a7772;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #435154;
+  font-weight: 700;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid #cfdcd2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.rental {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.price-line {
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid #e4ece6;
+}
+
+.price-line.total {
+  border: 0;
+  font-size: 20px;
+}
+
+.full {
+  width: 100%;
+  margin: 16px 0 10px;
+}
+
+.equipment-card .icon-tile {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 14px;
+  color: #0a7772;
+  background: #dcefeb;
+  border-radius: 8px;
+}
+
+.stock,
+.status {
+  color: #0a7772;
+  font-weight: 800;
+}
+
+.info-panel {
+  margin-top: 18px;
+}
+
+.table {
+  min-width: 780px;
+}
+
+.table-head,
+.table-row {
+  grid-template-columns: 1.2fr 0.8fr 1.2fr 0.6fr 0.7fr 0.7fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+.table-head {
+  color: #607073;
+  font-weight: 800;
+  background: #edf3ed;
+  border-radius: 8px;
+}
+
+.table-row {
+  border-bottom: 1px solid #e4ece6;
+}
+
+.table-row button,
+.admin-modules button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.contact-list {
+  display: grid;
+  gap: 14px;
+}
+
+.contact-list p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.map-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  padding: 24px;
+  color: #2c3d40;
+  text-align: center;
+  background: repeating-linear-gradient(45deg, #deebe3, #deebe3 12px, #eef5ee 12px, #eef5ee 24px);
+  border: 1px solid #d2dfd6;
+  border-radius: 8px;
+}
+
+.map-placeholder span {
+  color: #607073;
+}
+
+.stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.stat-card svg {
+  color: #0a7772;
+}
+
+.stat-card strong {
+  font-size: 28px;
+}
+
+.admin-modules {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  padding: 22px;
+  color: #526164;
+  border-top: 1px solid #dce5dd;
+}
+
+@media (max-width: 980px) {
+  .site-header {
+    flex-wrap: wrap;
+  }
+
+  .hotline {
+    width: 100%;
+  }
+
+  .hero,
+  .booking-layout,
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-strip,
+  .card-grid,
+  .stat-grid,
+  .admin-modules {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    width: min(100% - 24px, 1160px);
+  }
+
+  .main-nav a span,
+  .hotline span {
+    display: none;
+  }
+
+  .hero {
+    min-height: 520px;
+    padding: 24px;
+  }
+
+  .feature-strip,
+  .card-grid,
+  .stat-grid,
+  .admin-modules,
+  .form-grid,
+  .segmented {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    overflow-x: auto;
+  }
+}

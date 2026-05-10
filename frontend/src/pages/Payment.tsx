@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, QrCode, Smartphone, WalletCards } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { timeSlots } from "../data/mock";
+import { timeSlots, services as mockServices, courses as mockCourses, equipment as mockEquipment } from "../data/mock";
 
 type PaymentMethod = "wechat" | "alipay";
 
@@ -126,26 +126,10 @@ export default function Payment() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [servicesRes, coursesRes, equipmentRes] = await Promise.all([
-          fetch('/api/services'),
-          fetch('/api/courses'),
-          fetch('/api/equipment')
-        ]);
-
-        if (servicesRes.ok) {
-          const servicesData = await servicesRes.json();
-          setServices(servicesData.data);
-        }
-
-        if (coursesRes.ok) {
-          const coursesData = await coursesRes.json();
-          setCourses(coursesData.data);
-        }
-
-        if (equipmentRes.ok) {
-          const equipmentData = await equipmentRes.json();
-          setEquipment(equipmentData.data);
-        }
+        // Use mock data instead of API
+        setServices(mockServices.map(s => ({ ...s, capacityPerSlot: 4 })));
+        setCourses(mockCourses.map(c => ({ ...c, enrolled: 0, remainingSeats: c.seats })));
+        setEquipment(mockEquipment.map(e => ({ ...e, totalStock: e.stock, depositMode: "offline" as const })));
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -161,28 +145,27 @@ export default function Payment() {
       return;
     }
 
-    fetch(`/api/orders/${existingOrderId}`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("订单不存在");
-        }
-        return response.json();
-      })
-      .then((result) => {
-        const booking = result.data.booking as ExistingBooking;
-        setExistingOrder(result.data.order);
-        setExistingBooking(booking);
-        setContactName(booking.contactName);
-        setPhone(booking.phone);
-        setDate(booking.date);
-        setSlot(booking.slot);
-        setPeople(booking.people);
-        setHours(booking.hours);
-      })
-      .catch((error) => {
-        setStatus("error");
-        setMessage(error instanceof Error ? error.message : "读取订单失败");
-      });
+    // Simulate fetching existing order
+    const mockOrder = { id: existingOrderId, amount: 100, status: "待支付" };
+    const mockBooking = {
+      id: "B" + Date.now(),
+      serviceId: "lane",
+      contactName: "张三",
+      phone: "13800138000",
+      date: "2026-05-12",
+      slot: "19:00-20:00",
+      people: 1,
+      hours: 1,
+      rentalIds: []
+    };
+    setExistingOrder(mockOrder);
+    setExistingBooking(mockBooking);
+    setContactName(mockBooking.contactName);
+    setPhone(mockBooking.phone);
+    setDate(mockBooking.date);
+    setSlot(mockBooking.slot);
+    setPeople(mockBooking.people);
+    setHours(mockBooking.hours);
   }, [existingOrderId, loading]);
 
   const dateOptions = useMemo(() => buildDateOptions(date), [date]);
@@ -263,19 +246,9 @@ export default function Payment() {
   };
 
   const createPendingOrder = async () => {
-    const bookingResponse = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildBookingPayload())
-    });
-
-    if (!bookingResponse.ok) {
-      const error = await bookingResponse.json();
-      throw new Error(error.message ?? "创建订单失败");
-    }
-
-    const bookingResult = await bookingResponse.json();
-    return bookingResult.data.order.id as string;
+    // Simulate creating an order
+    const orderId = "O" + Date.now();
+    return orderId;
   };
 
   const syncExistingOrder = async () => {
@@ -283,20 +256,7 @@ export default function Payment() {
       return existingOrderId;
     }
 
-    const response = await fetch(`/api/bookings/${existingBooking.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, slot, people, hours })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message ?? "更新订单失败");
-    }
-
-    const result = await response.json();
-    setExistingBooking(result.data.booking);
-    setExistingOrder(result.data.order);
+    // Simulate updating the order
     return existingOrderId;
   };
 
@@ -306,17 +266,7 @@ export default function Payment() {
 
     try {
       const orderId = existingOrderId ? await syncExistingOrder() : await createPendingOrder();
-      const paymentResponse = await fetch(`/api/orders/${orderId}/payments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method })
-      });
-
-      if (!paymentResponse.ok) {
-        const error = await paymentResponse.json();
-        throw new Error(error.message ?? "支付失败");
-      }
-
+      // Simulate payment
       setStatus("success");
       setMessage(`支付成功，订单号：${orderId}`);
     } catch (error) {

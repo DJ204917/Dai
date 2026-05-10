@@ -28,6 +28,51 @@ npm run dev
 - 后台管理：仪表盘、预约、订单、装备、内容和用户管理入口
 - 后端 API：`/api/bookings`、`/api/courses`、`/api/equipment`、`/api/orders`、`/api/admin/summary`
 
+## 后端接口
+
+浏览器打开 `http://localhost:4000/api` 可以查看接口清单。
+
+常用接口示例：
+
+```bash
+# 查询服务、课程、装备
+GET /api/services
+GET /api/courses
+GET /api/equipment
+
+# 查询某天泳道可用时间段
+GET /api/bookings/availability?date=2026-05-12&serviceId=lane
+
+# 创建预约，会自动校验容量/库存并生成待支付订单
+POST /api/bookings
+{
+  "serviceId": "lane",
+  "contactName": "张三",
+  "phone": "13800138000",
+  "date": "2026-05-12",
+  "slot": "10:00-11:00",
+  "people": 2,
+  "hours": 1,
+  "rentalIds": ["goggles"]
+}
+
+# 支付订单，订单变为 paid，预约变为 confirmed
+POST /api/orders/:orderId/payments
+{
+  "method": "wechat"
+}
+
+# 取消预约，释放装备库存；已支付订单进入退款审核
+POST /api/bookings/:bookingId/cancel
+
+# 后台汇总、管理装备、课程和内容
+GET /api/admin/summary
+POST /api/admin/equipment
+PATCH /api/admin/equipment/:equipmentId
+POST /api/admin/courses
+PATCH /api/admin/content/contact
+```
+
 ## 后续接入建议
 
 - 数据库：PostgreSQL 或 MySQL，使用 Prisma/TypeORM 管理模型

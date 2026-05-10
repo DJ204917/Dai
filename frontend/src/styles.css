@@ -262,6 +262,27 @@ button {
   padding: 20px;
 }
 
+.service-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 180px;
+  gap: 16px;
+}
+
+.service-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.service-action {
+  min-height: 38px;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
 .card h2,
 .card h3,
 .panel h2,
@@ -287,6 +308,13 @@ button {
 
 .booking-layout {
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 320px;
+  align-items: start;
+}
+
+.payment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
   align-items: start;
 }
 
@@ -318,6 +346,26 @@ button {
   border-radius: 8px;
 }
 
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  color: #0a7772;
+  text-decoration: none;
+  font-weight: 800;
+  background: #dcefeb;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 .list-row span,
 .summary-panel small,
 .card p {
@@ -338,7 +386,8 @@ button {
 .segmented button,
 .rental,
 .admin-modules button,
-.table-row button {
+.table-row button,
+.table-action {
   padding: 10px 12px;
   color: #273638;
   background: #edf3ed;
@@ -398,6 +447,180 @@ select {
   margin: 16px 0 10px;
 }
 
+.payment-methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.payment-method {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: #273638;
+  background: #edf3ed;
+  border: 1px solid #d7e3d9;
+}
+
+.payment-method.selected {
+  color: #ffffff;
+  background: #0a7772;
+}
+
+.secondary-pay-button {
+  width: 100%;
+  color: #0a7772;
+  background: #dcefeb;
+  border: 1px solid #b8d8d1;
+}
+
+.payment-channel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  color: #183739;
+  background: #edf3ed;
+  border: 1px solid #d7e3d9;
+  border-radius: 8px;
+}
+
+.payment-channel span {
+  display: block;
+  color: #607073;
+  font-size: 13px;
+}
+
+.mock-qr {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  color: #0a7772;
+  background:
+    linear-gradient(90deg, #0a7772 8px, transparent 8px) 0 0 / 16px 16px,
+    linear-gradient(#0a7772 8px, transparent 8px) 0 0 / 16px 16px,
+    #ffffff;
+  border: 6px solid #ffffff;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #b8d8d1;
+}
+
+.primary-button:disabled,
+.secondary-pay-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.payment-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.payment-result.success {
+  color: #0a514f;
+  background: #dcefeb;
+}
+
+.payment-result.error {
+  color: #8a2a17;
+  background: #ffe8df;
+}
+
+.secondary-link {
+  display: inline-flex;
+  margin-top: 12px;
+  color: #0a7772;
+  font-weight: 800;
+}
+
+.detail-page {
+  background: #f5f7f4;
+}
+
+.detail-hero {
+  min-height: 430px;
+  display: flex;
+  align-items: flex-end;
+  padding: clamp(28px, 6vw, 64px);
+  color: #ffffff;
+  background-size: cover;
+  background-position: center;
+}
+
+.detail-hero-content {
+  width: min(760px, 100%);
+}
+
+.detail-hero h1 {
+  margin: 0;
+  font-size: clamp(40px, 7vw, 76px);
+  line-height: 1.05;
+}
+
+.detail-hero p {
+  max-width: 660px;
+  font-size: 18px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.detail-content {
+  padding-top: 24px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.detail-intro {
+  color: #526164;
+  font-size: 17px;
+}
+
+.highlight-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.highlight-list div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: #173336;
+  background: #edf3ed;
+  border-radius: 8px;
+}
+
+.highlight-list svg {
+  flex: 0 0 auto;
+  color: #0a7772;
+}
+
 .equipment-card .icon-tile {
   display: grid;
   place-items: center;
@@ -407,6 +630,67 @@ select {
   color: #0a7772;
   background: #dcefeb;
   border-radius: 8px;
+}
+
+.quantity-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quantity-selector button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #dce5dd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-weight: bold;
+}
+
+.quantity-selector button:hover {
+  background: #f0f2f0;
+}
+
+.quantity-selector input {
+  width: 60px;
+  text-align: center;
+  border: 1px solid #dce5dd;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.checkout-panel {
+  margin-top: 24px;
+  background: #e8f4f8;
+  border: 1px solid #b8d4e0;
+}
+
+.checkout-panel ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.checkout-panel li {
+  margin: 4px 0;
+}
+
+.deposit-info {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f8ff;
+  border: 1px solid #b8d4e0;
+  border-radius: 8px;
+}
+
+.deposit-note {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #0a7772;
+  font-weight: 500;
 }
 
 .stock,
@@ -442,11 +726,23 @@ select {
 }
 
 .table-row button,
-.admin-modules button {
+.admin-modules button,
+.table-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+.table-action {
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.table-action.primary {
+  color: #ffffff;
+  background: #0a7772;
+  border-color: #0a7772;
 }
 
 .contact-list {
@@ -523,6 +819,8 @@ select {
 
   .hero,
   .booking-layout,
+  .payment-layout,
+  .detail-grid,
   .two-column {
     grid-template-columns: 1fr;
   }
@@ -550,10 +848,24 @@ select {
     padding: 24px;
   }
 
+  .detail-hero {
+    min-height: 520px;
+    padding: 24px;
+  }
+
+  .list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .row-actions {
+    justify-content: space-between;
+  }
+
   .feature-strip,
   .card-grid,
   .stat-grid,
   .admin-modules,
+  .payment-methods,
   .form-grid,
   .segmented {
     grid-template-columns: 1fr;

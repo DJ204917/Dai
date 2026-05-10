@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { equipment, services, timeSlots } from "../data/mock";
 
 export default function Booking() {
@@ -7,6 +8,7 @@ export default function Booking() {
   const [people, setPeople] = useState(2);
   const [hours, setHours] = useState(1);
   const [slot, setSlot] = useState(timeSlots[0]);
+  const [date, setDate] = useState("2026-05-10");
   const [rentals, setRentals] = useState<string[]>(["goggles"]);
 
   const service = services.find((item) => item.id === serviceId) ?? services[0];
@@ -39,7 +41,7 @@ export default function Booking() {
           <div className="form-grid">
             <label>
               日期
-              <input type="date" defaultValue="2026-05-10" />
+              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
             <label>
               时间段
@@ -76,7 +78,9 @@ export default function Booking() {
           <div className="price-line"><span>服务费用</span><strong>¥{bookingTotal}</strong></div>
           <div className="price-line"><span>装备租赁</span><strong>¥{rentalTotal}</strong></div>
           <div className="price-line total"><span>合计</span><strong>¥{total}</strong></div>
-          <button className="primary-button full">提交预约并支付</button>
+          <Link className="primary-button full" to={`/payment?service=${serviceId}&date=${date}&slot=${encodeURIComponent(slot)}&people=${people}&hours=${hours}&rentals=${rentals.join(",")}`}>
+            提交预约并支付
+          </Link>
           <small>提交后可通过短信和站内信发送预约编号、地点和注意事项。</small>
         </aside>
       </div>

@@ -1,26 +1,427 @@
-export const services = [
-  { id: "lane", name: "泳道预约", price: 40, unit: "hour" },
-  { id: "course", name: "课程预约", price: 128, unit: "lesson" },
-  { id: "private", name: "包场咨询", price: 1200, unit: "session" }
-];
+import db from './database.js';
 
-export const courses = [
-  { id: "adult-basic", title: "成人初级班", coach: "林教练", time: "周二/周四 19:30", seats: 6, price: 128 },
-  { id: "kids-summer", title: "儿童暑期班", coach: "周教练", time: "周一/三/五 10:00", seats: 4, price: 168 },
-  { id: "advanced", title: "自由泳进阶", coach: "陈教练", time: "周六 15:00", seats: 8, price: 188 }
-];
+export type ServiceId = "lane" | "course" | "private" | "rental";
+export type BookingStatus = "pending_payment" | "confirmed" | "cancelled" | "completed";
+export type OrderStatus = "pending_payment" | "paid" | "refund_reviewing" | "refunded" | "cancelled";
+export type PaymentMethod = "wechat" | "alipay" | "unionpay";
 
-export const equipment = [
-  { id: "goggles", name: "防雾泳镜", price: 12, deposit: 50, stock: 18 },
-  { id: "cap", name: "硅胶泳帽", price: 6, deposit: 20, stock: 35 },
-  { id: "float-ring", name: "儿童泳圈", price: 18, deposit: 80, stock: 12 },
-  { id: "dry-bag", name: "防水袋", price: 10, deposit: 40, stock: 20 }
-];
+export interface Service {
+  id: ServiceId;
+  name: string;
+  price: number;
+  unit: "hour" | "lesson" | "session";
+  capacityPerSlot: number;
+  description: string;
+}
 
-export const bookings = [
-  { id: "B20260509001", serviceId: "lane", date: "2026-05-10", slot: "19:00-20:00", people: 2, status: "confirmed" }
-];
+export interface Course {
+  id: string;
+  title: string;
+  coach: string;
+  time: string;
+  seats: number;
+  enrolled: number;
+  price: number;
+  description: string;
+}
 
-export const orders = [
-  { id: "O20260509001", bookingId: "B20260509001", amount: 100, status: "pending_payment", paymentMethod: "wechat" }
-];
+export interface Equipment {
+  id: string;
+  name: string;
+  price: number;
+  deposit: number;
+  stock: number;
+  totalStock: number;
+  description: string;
+  depositMode: "offline" | "online_hold";
+}
+
+export interface FeeItem {
+  label: string;
+  amount: number;
+}
+
+export interface Booking {
+  id: string;
+  serviceId: ServiceId;
+  courseId?: string;
+  contactName: string;
+  phone: string;
+  date: string;
+  slot: string;
+  people: number;
+  hours: number;
+  rentalIds: string[];
+  status: BookingStatus;
+  amount: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Order {
+  id: string;
+  bookingId: string;
+  amount: number;
+  status: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  feeItems: FeeItem[];
+  invoice?: {
+    title: string;
+    taxNo?: string;
+    email: string;
+    status: "requested" | "issued";
+    requestedAt: string;
+  };
+  paidAt?: string;
+  refundRequestedAt?: string;
+  refundedAt?: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  phone: string;
+  memberCardNo?: string;
+  points: number;
+}
+
+export const timeSlots = ["09:00-10:00", "10:00-11:00", "14:00-15:00", "16:00-17:00", "19:00-20:00", "20:00-21:00"];
+
+// Database query functions
+export function getServices(): Service[] {
+  const rows = db.prepare('SELECT * FROM services').all();
+  return rows.map(row => ({
+    id: row.id as ServiceId,
+    name: row.name,
+    price: row.price,
+    unit: row.unit,
+    capacityPerSlot: row.capacity_per_slot,
+    description: row.description
+  }));
+}
+
+export function getCourses(): Course[] {
+  const rows = db.prepare('SELECT * FROM courses').all();
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    coach: row.coach,
+    time: row.time,
+    seats: row.seats,
+    enrolled: row.enrolled,
+    price: row.price,
+    description: row.description
+  }));
+}
+
+export function getEquipment(): Equipment[] {
+  const rows = db.prepare('SELECT * FROM equipment').all();
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    price: row.price,
+    deposit: row.deposit,
+    stock: row.stock,
+    totalStock: row.total_stock,
+    description: row.description,
+    depositMode: row.deposit_mode as "offline" | "online_hold"
+  }));
+}
+
+export function getEquipmentById(id: string): Equipment | undefined {
+  const row = db.prepare('SELECT * FROM equipment WHERE id = ?').get(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    name: row.name,
+    price: row.price,
+    deposit: row.deposit,
+    stock: row.stock,
+    totalStock: row.total_stock,
+    description: row.description,
+    depositMode: row.deposit_mode as "offline" | "online_hold"
+  };
+}
+
+export function updateEquipmentStock(id: string, newStock: number): void {
+  db.prepare('UPDATE equipment SET stock = ? WHERE id = ?').run(newStock, id);
+}
+
+export function getUsers(): User[] {
+  const rows = db.prepare('SELECT * FROM users').all();
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    memberCardNo: row.member_card_no,
+    points: row.points
+  }));
+}
+
+export function getBookings(): Booking[] {
+  const rows = db.prepare('SELECT * FROM bookings').all();
+  return rows.map(row => ({
+    id: row.id,
+    serviceId: row.service_id as ServiceId,
+    courseId: row.course_id,
+    contactName: row.contact_name,
+    phone: row.phone,
+    date: row.date,
+    slot: row.slot,
+    people: row.people,
+    hours: row.hours,
+    rentalIds: JSON.parse(row.rental_ids || '[]'),
+    status: row.status as BookingStatus,
+    amount: row.amount,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }));
+}
+
+export function getBookingById(id: string): Booking | undefined {
+  const row = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    serviceId: row.service_id as ServiceId,
+    courseId: row.course_id,
+    contactName: row.contact_name,
+    phone: row.phone,
+    date: row.date,
+    slot: row.slot,
+    people: row.people,
+    hours: row.hours,
+    rentalIds: JSON.parse(row.rental_ids || '[]'),
+    status: row.status as BookingStatus,
+    amount: row.amount,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+export function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): Booking {
+  const id = `B${Date.now()}`;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO bookings (id, service_id, course_id, contact_name, phone, date, slot, people, hours, rental_ids, status, amount, notes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    booking.serviceId,
+    booking.courseId,
+    booking.contactName,
+    booking.phone,
+    booking.date,
+    booking.slot,
+    booking.people,
+    booking.hours,
+    JSON.stringify(booking.rentalIds),
+    booking.status,
+    booking.amount,
+    booking.notes,
+    now,
+    now
+  );
+
+  // Update equipment stock
+  booking.rentalIds.forEach(equipmentId => {
+    const equipment = getEquipmentById(equipmentId);
+    if (equipment && equipment.stock > 0) {
+      updateEquipmentStock(equipmentId, equipment.stock - 1);
+    }
+  });
+
+  return {
+    id,
+    ...booking,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function updateBooking(id: string, updates: Partial<Booking>): Booking | undefined {
+  const existing = getBookingById(id);
+  if (!existing) return undefined;
+
+  const now = new Date().toISOString();
+  const fields = [];
+  const values = [];
+
+  if (updates.contactName !== undefined) {
+    fields.push('contact_name = ?');
+    values.push(updates.contactName);
+  }
+  if (updates.phone !== undefined) {
+    fields.push('phone = ?');
+    values.push(updates.phone);
+  }
+  if (updates.date !== undefined) {
+    fields.push('date = ?');
+    values.push(updates.date);
+  }
+  if (updates.slot !== undefined) {
+    fields.push('slot = ?');
+    values.push(updates.slot);
+  }
+  if (updates.people !== undefined) {
+    fields.push('people = ?');
+    values.push(updates.people);
+  }
+  if (updates.hours !== undefined) {
+    fields.push('hours = ?');
+    values.push(updates.hours);
+  }
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    values.push(updates.status);
+  }
+  if (updates.amount !== undefined) {
+    fields.push('amount = ?');
+    values.push(updates.amount);
+  }
+  if (updates.notes !== undefined) {
+    fields.push('notes = ?');
+    values.push(updates.notes);
+  }
+
+  fields.push('updated_at = ?');
+  values.push(now);
+  values.push(id);
+
+  db.prepare(`UPDATE bookings SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+  return getBookingById(id);
+}
+
+export function getOrders(): Order[] {
+  const rows = db.prepare('SELECT * FROM orders').all();
+  return rows.map(row => ({
+    id: row.id,
+    bookingId: row.booking_id,
+    amount: row.amount,
+    status: row.status as OrderStatus,
+    paymentMethod: row.payment_method as PaymentMethod,
+    feeItems: JSON.parse(row.fee_items || '[]'),
+    invoice: row.invoice_title ? {
+      title: row.invoice_title,
+      taxNo: row.invoice_tax_no,
+      email: row.invoice_email,
+      status: row.invoice_status as "requested" | "issued",
+      requestedAt: row.refund_requested_at
+    } : undefined,
+    paidAt: row.paid_at,
+    refundRequestedAt: row.refund_requested_at,
+    refundedAt: row.refunded_at
+  }));
+}
+
+export function getOrderById(id: string): Order | undefined {
+  const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    bookingId: row.booking_id,
+    amount: row.amount,
+    status: row.status as OrderStatus,
+    paymentMethod: row.payment_method as PaymentMethod,
+    feeItems: JSON.parse(row.fee_items || '[]'),
+    invoice: row.invoice_title ? {
+      title: row.invoice_title,
+      taxNo: row.invoice_tax_no,
+      email: row.invoice_email,
+      status: row.invoice_status as "requested" | "issued",
+      requestedAt: row.refund_requested_at
+    } : undefined,
+    paidAt: row.paid_at,
+    refundRequestedAt: row.refund_requested_at,
+    refundedAt: row.refunded_at
+  };
+}
+
+export function createOrder(order: Omit<Order, 'id'>): Order {
+  const id = `O${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, booking_id, amount, status, payment_method, fee_items, invoice_title, invoice_tax_no, invoice_email, invoice_status, paid_at, refund_requested_at, refunded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    order.bookingId,
+    order.amount,
+    order.status,
+    order.paymentMethod,
+    JSON.stringify(order.feeItems),
+    order.invoice?.title,
+    order.invoice?.taxNo,
+    order.invoice?.email,
+    order.invoice?.status,
+    order.paidAt,
+    order.refundRequestedAt,
+    order.refundedAt
+  );
+  return { id, ...order };
+}
+
+export function updateOrder(id: string, updates: Partial<Order>): Order | undefined {
+  const existing = getOrderById(id);
+  if (!existing) return undefined;
+
+  const fields = [];
+  const values = [];
+
+  if (updates.status !== undefined) {
+    fields.push('status = ?');
+    values.push(updates.status);
+  }
+  if (updates.paymentMethod !== undefined) {
+    fields.push('payment_method = ?');
+    values.push(updates.paymentMethod);
+  }
+  if (updates.paidAt !== undefined) {
+    fields.push('paid_at = ?');
+    values.push(updates.paidAt);
+  }
+  if (updates.refundRequestedAt !== undefined) {
+    fields.push('refund_requested_at = ?');
+    values.push(updates.refundRequestedAt);
+  }
+  if (updates.refundedAt !== undefined) {
+    fields.push('refunded_at = ?');
+    values.push(updates.refundedAt);
+  }
+  if (updates.invoice !== undefined) {
+    fields.push('invoice_title = ?');
+    values.push(updates.invoice.title);
+    fields.push('invoice_tax_no = ?');
+    values.push(updates.invoice.taxNo);
+    fields.push('invoice_email = ?');
+    values.push(updates.invoice.email);
+    fields.push('invoice_status = ?');
+    values.push(updates.invoice.status);
+  }
+
+  values.push(id);
+  db.prepare(`UPDATE orders SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+  return getOrderById(id);
+}
+
+export function getSiteContent(): Record<string, string> {
+  const rows = db.prepare('SELECT * FROM site_content').all();
+  const content: Record<string, string> = {};
+  rows.forEach(row => {
+    content[row.key] = row.value;
+  });
+  return content;
+}
+
+// Legacy exports for backward compatibility
+export const services = getServices();
+export const courses = getCourses();
+export const equipment = getEquipment();
+export const users = getUsers();
+export const bookings = getBookings();
+export const orders = getOrders();
+export const siteContent = getSiteContent();

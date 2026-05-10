@@ -45,10 +45,17 @@ export default function Home() {
         </div>
         <div className="card-grid">
           {services.map((service) => (
-            <article className="card" key={service.id}>
-              <h3>{service.name}</h3>
-              <p>{service.description}</p>
-              <strong>¥{service.price}/{service.unit}</strong>
+            <article className="card service-card" key={service.id}>
+              <div>
+                <h3>{service.name}</h3>
+                <p>{service.description}</p>
+              </div>
+              <div className="service-card-footer">
+                <strong>¥{service.price}/{service.unit}</strong>
+                <Link className="primary-button service-action" to={`/payment?service=${service.id}`}>
+                  去支付 <ArrowRight size={16} />
+                </Link>
+              </div>
             </article>
           ))}
         </div>
@@ -65,7 +72,10 @@ export default function Home() {
                   <strong>{course.title}</strong>
                   <span>{course.coach} · {course.time}</span>
                 </div>
-                <b>余 {course.seats}</b>
+                <div className="row-actions">
+                  <b>余 {course.seats}</b>
+                  <Link className="detail-button" to={`/details/course/${course.id}`}>详情</Link>
+                </div>
               </div>
             ))}
           </div>
@@ -80,7 +90,10 @@ export default function Home() {
                   <strong>{item.name}</strong>
                   <span>租金 ¥{item.price} · 押金 ¥{item.deposit}</span>
                 </div>
-                <b>库存 {item.stock}</b>
+                <div className="row-actions">
+                  <b>库存 {item.stock}</b>
+                  <Link className="detail-button" to={`/details/equipment/${item.id}`}>详情</Link>
+                </div>
               </div>
             ))}
           </div>

@@ -3,8 +3,10 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import Admin from "./pages/Admin";
 import Booking from "./pages/Booking";
 import Contact from "./pages/Contact";
+import Detail from "./pages/Detail";
 import Home from "./pages/Home";
 import Orders from "./pages/Orders";
+import Payment from "./pages/Payment";
 import Rental from "./pages/Rental";
 
 const navItems = [
@@ -46,7 +48,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/rental" element={<Rental />} />
+          <Route path="/details/:type/:id" element={<Detail />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/payment" element={<Payment />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

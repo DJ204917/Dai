@@ -79,9 +79,9 @@ export default function Detail() {
   }
 
   const title = "title" in item ? item.title : item.name;
-  const image = item.image;
-  const intro = item.intro;
-  const highlights = item.highlights;
+  const image = 'image' in item ? item.image : '';
+  const intro = 'intro' in item ? item.intro : ('description' in item ? item.description : '');
+  const highlights = 'highlights' in item ? item.highlights : [];
   const paymentUrl = isCourse
     ? `/payment?service=course&type=course&item=${item.id}`
     : `/payment?service=rental&type=equipment&item=${item.id}`;
@@ -108,14 +108,16 @@ export default function Detail() {
           <article className="panel">
             <h2>{isCourse ? "课程介绍" : "使用说明"}</h2>
             <p className="detail-intro">{intro}</p>
-            <div className="highlight-list">
-              {highlights.map((highlight) => (
-                <div key={highlight}>
-                  <CheckCircle2 size={18} />
-                  <span>{highlight}</span>
-                </div>
-              ))}
-            </div>
+            {highlights.length > 0 && (
+              <div className="highlight-list">
+                {highlights.map((highlight) => (
+                  <div key={highlight}>
+                    <CheckCircle2 size={18} />
+                    <span>{highlight}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </article>
 
           <aside className="summary-panel">

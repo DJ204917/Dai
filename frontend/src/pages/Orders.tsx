@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
+import { orders as mockOrders } from "../data/mock";
 
 interface Order {
   id: string;
@@ -32,37 +33,23 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/orders").then((response) => {
-        if (!response.ok) {
-          throw new Error(`获取订单失败: ${response.status}`);
-        }
-        return response.json();
-      }),
-      fetch("/api/bookings").then((response) => {
-        if (!response.ok) {
-          throw new Error(`获取预约失败: ${response.status}`);
-        }
-        return response.json();
-      })
-    ])
-      .then(([orderResult, bookingResult]) => {
-        setOrders(orderResult.data);
-        setBookings(bookingResult.data);
-      })
-      .catch((err) => {
-        setError(err.message);
-      })
-      .finally(() => setLoading(false));
+    try {
+      // Load orders from localStorage and merge with mock
+      const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const allOrders = [...mockOrders, ...localOrders];
+      setOrders(allOrders);
+      setError(null);
+    } catch (err) {
+      setError('加载订单失败');
+    } finally {
+      setLoading(false);
+    }
   }, []);
-
-  const bookingMap = useMemo(() => new Map(bookings.map((booking) => [booking.id, booking])), [bookings]);
 
   return (
     <div className="page compact-page">
@@ -81,15 +68,14 @@ export default function Orders() {
               <span>订单号</span><span>类型</span><span>时间</span><span>金额</span><span>状态</span><span>操作</span>
             </div>
             {orders.map((order) => {
-              const booking = bookingMap.get(order.bookingId);
-              const isPending = order.status === "pending_payment";
+              const isPending = order.status === "待支付";
               return (
                 <div className="table-row" key={order.id}>
                   <span>{order.id}</span>
-                  <span>{typeLabels[booking?.serviceId ?? ""] ?? "订单"}</span>
-                  <span>{booking ? `${booking.date} ${booking.slot}` : "-"}</span>
+                  <span>{order.type}</span>
+                  <span>{order.date}</span>
                   <span>¥{order.amount}</span>
-                  <span className="status">{statusLabels[order.status] ?? order.status}</span>
+                  <span className="status">{order.status}</span>
                   {isPending ? (
                     <Link className="table-action primary" to={`/payment?orderId=${order.id}`}>
                       <CreditCard size={16} /> 去支付

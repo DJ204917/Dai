@@ -269,6 +269,20 @@ export default function Payment() {
       // Simulate payment
       setStatus("success");
       setMessage(`支付成功，订单号：${orderId}`);
+
+      // Save order to localStorage
+      const orderType = selectedEquipment ? "装备租赁" : service.name;
+      const orderDate = service.id === "rental" ? new Date().toISOString().slice(0, 10) : date;
+      const newOrder = {
+        id: orderId,
+        type: orderType,
+        amount: total,
+        status: "已完成",
+        date: orderDate
+      };
+      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      existingOrders.push(newOrder);
+      localStorage.setItem('orders', JSON.stringify(existingOrders));
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "支付失败，请稍后重试");
@@ -283,6 +297,20 @@ export default function Payment() {
       const orderId = await createPendingOrder();
       setStatus("success");
       setMessage(`已生成待支付订单：${orderId}`);
+
+      // Save pending order to localStorage
+      const orderType = selectedEquipment ? "装备租赁" : service.name;
+      const orderDate = service.id === "rental" ? new Date().toISOString().slice(0, 10) : date;
+      const newOrder = {
+        id: orderId,
+        type: orderType,
+        amount: total,
+        status: "待支付",
+        date: orderDate
+      };
+      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      existingOrders.push(newOrder);
+      localStorage.setItem('orders', JSON.stringify(existingOrders));
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "创建待支付订单失败");
@@ -353,7 +381,7 @@ export default function Payment() {
               <div className="price-line"><span>租金总价</span><strong>¥{selectedEquipment.price * quantity}</strong></div>
               <div className="deposit-info">
                 <div className="price-line"><span>押金（线下支付）</span><strong>¥{selectedEquipment.deposit * quantity}</strong></div>
-                <p className="deposit-note">⚠️ 押金需在租赁时现场支付，归还装备时退还</p>
+                <p className="deposit-note">⚠️ 押金需要线下支付</p>
               </div>
             </>
           )}
@@ -374,7 +402,7 @@ export default function Payment() {
                   const item = equipment.find(e => e.id === id);
                   return sum + (item?.deposit ?? 0) * qty;
                 }, 0)}</strong></div>
-                <p className="deposit-note">⚠️ 押金需在租赁时现场支付，归还装备时退还</p>
+                <p className="deposit-note">⚠️ 押金需要线下支付</p>
               </div>
             </div>
           )}

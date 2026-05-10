@@ -97,7 +97,7 @@ export default function Rental() {
       )}
       <section className="panel info-panel">
         <h2>押金处理方案</h2>
-        <p>当前框架预留线上预授权和线下押金两种模式。上线初期建议使用线下押金，技术链路更短；后续可接入支付预授权，由店员后台确认归还后解冻。</p>
+        <p>需要线下支付押金</p>
       </section>
     </div>
   );

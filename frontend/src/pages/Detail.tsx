@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { courses, equipment } from "../data/mock";
 
 interface Course {
   id: string;
@@ -38,16 +37,13 @@ export default function Detail() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        let foundItem: Course | Equipment | null = null;
-        if (isCourse) {
-          foundItem = courses.find(c => c.id === id) || null;
-        } else {
-          foundItem = equipment.find(e => e.id === id) || null;
+        const endpoint = isCourse ? `/api/courses/${id}` : `/api/equipment/${id}`;
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
         }
-        if (!foundItem) {
-          throw new Error('Item not found');
-        }
-        setItem(foundItem);
+        const result = await response.json();
+        setItem(result.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -85,7 +81,7 @@ export default function Detail() {
   const title = "title" in item ? item.title : item.name;
   const image = item.image;
   const intro = item.intro;
-  const highlights = "highlights" in item ? item.highlights : [];
+  const highlights = item.highlights;
   const paymentUrl = isCourse
     ? `/payment?service=course&type=course&item=${item.id}`
     : `/payment?service=rental&type=equipment&item=${item.id}`;

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { AppError } from "../middleware/errorHandler.js";
-import { getBookings, getCourses, getEquipment, getServices, createBooking, updateBooking, getBookingById, timeSlots } from "../data/store.js";
+import { createBooking, createOrder, getBookingById, getBookings, getCourses, getEquipment, getOrders, getServices, restoreBookingInventory, timeSlots, updateBooking } from "../data/store.js";
 
 const router = Router();
 
@@ -25,6 +25,11 @@ const updateBookingSchema = z.object({
   hours: z.number().int().positive().optional(),
   notes: z.string().optional()
 });
+
+function calculateLaneAmount(hours: number, people: number) {
+  const billableHours = Math.max(hours, 2);
+  return (40 + Math.max(billableHours - 2, 0) * 10) * people;
+}
 
 function calculateAvailability(date: string, serviceId = "lane") {
   const services = getServices();
@@ -62,7 +67,7 @@ function buildFeeItems(input: z.infer<typeof createBookingSchema>) {
   let serviceAmount = service.price;
 
   if (input.serviceId === "lane") {
-    serviceAmount = service.price * input.people * input.hours;
+    serviceAmount = calculateLaneAmount(input.hours, input.people);
     feeItems.push({ label: `${service.name} ${input.hours}小时 x ${input.people}人`, amount: serviceAmount });
   }
 
@@ -178,8 +183,13 @@ router.post("/", (req, res) => {
     amount
   });
 
-  const orders = getOrders();
-  const order = orders.find((item) => item.bookingId === booking.id);
+  const order = createOrder({
+    bookingId: booking.id,
+    amount,
+    status: "pending_payment",
+    feeItems
+  });
+
   res.status(201).json({ data: { booking, order } });
 });
 
@@ -236,14 +246,7 @@ router.post("/:bookingId/cancel", (req, res) => {
     throw new AppError(404, "预约不存在");
   }
 
-  // Restore equipment stock
-  updatedBooking.rentalIds.forEach(rentalId => {
-    const equipment = getEquipment();
-    const item = equipment.find(e => e.id === rentalId);
-    if (item && item.stock < item.totalStock) {
-      // Note: In a real implementation, you'd update stock in database
-    }
-  });
+  restoreBookingInventory(updatedBooking);
 
   const orders = getOrders();
   const order = orders.find((item) => item.bookingId === updatedBooking.id);

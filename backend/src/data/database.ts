@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const dbPath = path.join(__dirname, '../../data/database.db');
-const db = new Database(dbPath);
+const db: any = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
@@ -85,6 +85,7 @@ db.exec(`
     paid_at TEXT,
     refund_requested_at TEXT,
     refunded_at TEXT,
+    created_at TEXT,
     FOREIGN KEY (booking_id) REFERENCES bookings(id)
   );
 
@@ -93,6 +94,22 @@ db.exec(`
     value TEXT
   );
 `);
+
+const orderColumns = db.prepare(`PRAGMA table_info(orders)`).all();
+if (!orderColumns.some((column: any) => column.name === 'created_at')) {
+  db.prepare(`ALTER TABLE orders ADD COLUMN created_at TEXT`).run();
+}
+
+db.prepare(`
+  UPDATE orders
+  SET created_at = COALESCE(
+    created_at,
+    (SELECT bookings.created_at FROM bookings WHERE bookings.id = orders.booking_id),
+    paid_at,
+    datetime('now')
+  )
+  WHERE created_at IS NULL
+`).run();
 
 // Insert initial data
 const insertService = db.prepare(`
@@ -121,8 +138,8 @@ const insertBooking = db.prepare(`
 `);
 
 const insertOrder = db.prepare(`
-  INSERT OR IGNORE INTO orders (id, booking_id, amount, status, payment_method, fee_items, paid_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
+  INSERT OR IGNORE INTO orders (id, booking_id, amount, status, payment_method, fee_items, paid_at, created_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const insertSiteContent = db.prepare(`
@@ -154,7 +171,7 @@ insertUser.run('U10001', '示例会员', '13800000000', 'M20260509001', 120);
 insertBooking.run('B20260509001', 'lane', null, '示例会员', '13800000000', '2026-05-10', '19:00-20:00', 2, 1, '["goggles","cap"]', 'confirmed', 98, null, '2026-05-09T08:00:00.000Z', '2026-05-09T08:05:00.000Z');
 
 // Orders
-insertOrder.run('O20260509001', 'B20260509001', 98, 'paid', 'wechat', '[{"label":"泳道预约 1小时","amount":80},{"label":"防雾泳镜租赁","amount":12},{"label":"硅胶泳帽租赁","amount":6}]', '2026-05-09T08:05:00.000Z');
+insertOrder.run('O20260509001', 'B20260509001', 98, 'paid', 'wechat', '[{"label":"泳道预约 1小时","amount":80},{"label":"防雾泳镜租赁","amount":12},{"label":"硅胶泳帽租赁","amount":6}]', '2026-05-09T08:05:00.000Z', '2026-05-09T08:00:00.000Z');
 
 // Site content
 insertSiteContent.run('shopName', '澄蓝泳馆');

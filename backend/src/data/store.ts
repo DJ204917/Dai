@@ -76,6 +76,7 @@ export interface Order {
   paidAt?: string;
   refundRequestedAt?: string;
   refundedAt?: string;
+  createdAt: string;
 }
 
 export interface User {
@@ -91,7 +92,7 @@ export const timeSlots = ["09:00-10:00", "10:00-11:00", "14:00-15:00", "16:00-17
 // Database query functions
 export function getServices(): Service[] {
   const rows = db.prepare('SELECT * FROM services').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id as ServiceId,
     name: row.name,
     price: row.price,
@@ -103,7 +104,7 @@ export function getServices(): Service[] {
 
 export function getCourses(): Course[] {
   const rows = db.prepare('SELECT * FROM courses').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
     coach: row.coach,
@@ -115,9 +116,28 @@ export function getCourses(): Course[] {
   }));
 }
 
+export function getCourseById(id: string): Course | undefined {
+  const row = db.prepare('SELECT * FROM courses WHERE id = ?').get(id);
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    title: row.title,
+    coach: row.coach,
+    time: row.time,
+    seats: row.seats,
+    enrolled: row.enrolled,
+    price: row.price,
+    description: row.description
+  };
+}
+
+export function updateCourseEnrollment(id: string, enrolled: number): void {
+  db.prepare('UPDATE courses SET enrolled = ? WHERE id = ?').run(enrolled, id);
+}
+
 export function getEquipment(): Equipment[] {
   const rows = db.prepare('SELECT * FROM equipment').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id,
     name: row.name,
     price: row.price,
@@ -148,9 +168,48 @@ export function updateEquipmentStock(id: string, newStock: number): void {
   db.prepare('UPDATE equipment SET stock = ? WHERE id = ?').run(newStock, id);
 }
 
+function countRentalIds(rentalIds: string[]): Record<string, number> {
+  return rentalIds.reduce<Record<string, number>>((counts, id) => {
+    counts[id] = (counts[id] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function reserveBookingInventory(booking: Omit<Booking, 'id' | 'createdAt' | 'updatedAt'>): void {
+  if (booking.serviceId === "course" && booking.courseId) {
+    const course = getCourseById(booking.courseId);
+    if (course) {
+      updateCourseEnrollment(course.id, course.enrolled + booking.people);
+    }
+  }
+
+  for (const [equipmentId, count] of Object.entries(countRentalIds(booking.rentalIds))) {
+    const equipment = getEquipmentById(equipmentId);
+    if (equipment) {
+      updateEquipmentStock(equipmentId, Math.max(equipment.stock - count, 0));
+    }
+  }
+}
+
+export function restoreBookingInventory(booking: Booking): void {
+  if (booking.serviceId === "course" && booking.courseId) {
+    const course = getCourseById(booking.courseId);
+    if (course) {
+      updateCourseEnrollment(course.id, Math.max(course.enrolled - booking.people, 0));
+    }
+  }
+
+  for (const [equipmentId, count] of Object.entries(countRentalIds(booking.rentalIds))) {
+    const equipment = getEquipmentById(equipmentId);
+    if (equipment) {
+      updateEquipmentStock(equipmentId, Math.min(equipment.stock + count, equipment.totalStock));
+    }
+  }
+}
+
 export function getUsers(): User[] {
   const rows = db.prepare('SELECT * FROM users').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id,
     name: row.name,
     phone: row.phone,
@@ -161,7 +220,7 @@ export function getUsers(): User[] {
 
 export function getBookings(): Booking[] {
   const rows = db.prepare('SELECT * FROM bookings').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id,
     serviceId: row.service_id as ServiceId,
     courseId: row.course_id,
@@ -226,13 +285,7 @@ export function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updat
     now
   );
 
-  // Update equipment stock
-  booking.rentalIds.forEach(equipmentId => {
-    const equipment = getEquipmentById(equipmentId);
-    if (equipment && equipment.stock > 0) {
-      updateEquipmentStock(equipmentId, equipment.stock - 1);
-    }
-  });
+  reserveBookingInventory(booking);
 
   return {
     id,
@@ -298,7 +351,7 @@ export function updateBooking(id: string, updates: Partial<Booking>): Booking | 
 
 export function getOrders(): Order[] {
   const rows = db.prepare('SELECT * FROM orders').all();
-  return rows.map(row => ({
+  return rows.map((row: any) => ({
     id: row.id,
     bookingId: row.booking_id,
     amount: row.amount,
@@ -314,7 +367,8 @@ export function getOrders(): Order[] {
     } : undefined,
     paidAt: row.paid_at,
     refundRequestedAt: row.refund_requested_at,
-    refundedAt: row.refunded_at
+    refundedAt: row.refunded_at,
+    createdAt: row.created_at
   }));
 }
 
@@ -337,15 +391,17 @@ export function getOrderById(id: string): Order | undefined {
     } : undefined,
     paidAt: row.paid_at,
     refundRequestedAt: row.refund_requested_at,
-    refundedAt: row.refunded_at
+    refundedAt: row.refunded_at,
+    createdAt: row.created_at
   };
 }
 
-export function createOrder(order: Omit<Order, 'id'>): Order {
+export function createOrder(order: Omit<Order, 'id' | 'createdAt'>): Order {
   const id = `O${Date.now()}`;
+  const createdAt = new Date().toISOString();
   db.prepare(`
-    INSERT INTO orders (id, booking_id, amount, status, payment_method, fee_items, invoice_title, invoice_tax_no, invoice_email, invoice_status, paid_at, refund_requested_at, refunded_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (id, booking_id, amount, status, payment_method, fee_items, invoice_title, invoice_tax_no, invoice_email, invoice_status, paid_at, refund_requested_at, refunded_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     order.bookingId,
@@ -359,9 +415,10 @@ export function createOrder(order: Omit<Order, 'id'>): Order {
     order.invoice?.status,
     order.paidAt,
     order.refundRequestedAt,
-    order.refundedAt
+    order.refundedAt,
+    createdAt
   );
-  return { id, ...order };
+  return { id, ...order, createdAt };
 }
 
 export function updateOrder(id: string, updates: Partial<Order>): Order | undefined {
@@ -411,7 +468,7 @@ export function updateOrder(id: string, updates: Partial<Order>): Order | undefi
 export function getSiteContent(): Record<string, string> {
   const rows = db.prepare('SELECT * FROM site_content').all();
   const content: Record<string, string> = {};
-  rows.forEach(row => {
+  rows.forEach((row: any) => {
     content[row.key] = row.value;
   });
   return content;

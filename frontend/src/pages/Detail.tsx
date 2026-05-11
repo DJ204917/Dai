@@ -124,7 +124,7 @@ export default function Detail() {
             <h2>项目信息</h2>
             {"coach" in item && <div className="price-line"><span>教练</span><strong>{item.coach}</strong></div>}
             {"time" in item && <div className="price-line"><span>时间</span><strong>{item.time}</strong></div>}
-            {"seats" in item && <div className="price-line"><span>剩余名额</span><strong>{item.seats}</strong></div>}
+            {"seats" in item && <div className="price-line"><span>剩余名额</span><strong>{item.remainingSeats}</strong></div>}
             {"stock" in item && <div className="price-line"><span>库存</span><strong>{item.stock}</strong></div>}
             {"deposit" in item && <div className="price-line"><span>押金</span><strong>¥{item.deposit}</strong></div>}
             <div className="price-line total"><span>价格</span><strong>¥{item.price}</strong></div>

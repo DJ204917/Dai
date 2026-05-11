@@ -1,11 +1,103 @@
-import { ArrowRight, CalendarCheck, CreditCard, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, CalendarCheck, Clock, CreditCard, ShieldCheck, Store } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { courses, equipment, services } from "../data/mock";
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  description: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  coach: string;
+  time: string;
+  seats: number;
+  enrolled: number;
+  remainingSeats: number;
+  price: number;
+}
+
+interface Equipment {
+  id: string;
+  name: string;
+  price: number;
+  deposit: number;
+  stock: number;
+}
+
+const unitLabels: Record<string, string> = {
+  hour: "小时",
+  lesson: "节",
+  session: "场"
+};
 
 export default function Home() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [beijingTime, setBeijingTime] = useState("");
+
+  useEffect(() => {
+    const loadCatalog = async () => {
+      const [servicesResponse, coursesResponse, equipmentResponse] = await Promise.all([
+        fetch("/api/services"),
+        fetch("/api/courses"),
+        fetch("/api/equipment")
+      ]);
+      const [servicesResult, coursesResult, equipmentResult] = await Promise.all([
+        servicesResponse.json(),
+        coursesResponse.json(),
+        equipmentResponse.json()
+      ]);
+      setServices(servicesResult.data ?? []);
+      setCourses(coursesResult.data ?? []);
+      setEquipment(equipmentResult.data ?? []);
+    };
+
+    loadCatalog().catch((error) => {
+      console.error("Failed to load catalog", error);
+    });
+  }, []);
+
+  useEffect(() => {
+    const updateTime = () => {
+      setBeijingTime(
+        new Intl.DateTimeFormat("zh-CN", {
+          timeZone: "Asia/Shanghai",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }).format(new Date())
+      );
+    };
+
+    updateTime();
+    const timer = window.setInterval(updateTime, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const totalRemainingSeats = useMemo(
+    () => courses.reduce((sum, course) => sum + course.remainingSeats, 0),
+    [courses]
+  );
+
   return (
     <div className="page">
       <section className="hero">
+        <div className="home-status-bar" aria-label="首页实时信息">
+          <div className="home-time-card">
+            <Clock size={18} />
+            <span>北京时间</span>
+            <strong>{beijingTime}</strong>
+          </div>
+        </div>
         <div className="hero-content">
           <p className="eyebrow">官方预约平台</p>
           <h1>澄蓝泳馆</h1>
@@ -26,7 +118,7 @@ export default function Home() {
           </div>
           <div>
             <span>剩余课程名额</span>
-            <strong>18</strong>
+            <strong>{totalRemainingSeats}</strong>
           </div>
         </div>
       </section>
@@ -50,18 +142,30 @@ export default function Home() {
                 <h3>{service.name}</h3>
                 <p>{service.description}</p>
               </div>
-              <div className="service-card-footer">
-                <strong>¥{service.price}/{service.unit}</strong>
-                <Link className="primary-button service-action" to={`/payment?service=${service.id}`}>
-                  去支付 <ArrowRight size={16} />
-                </Link>
+              <div className={service.id === "course" || service.id === "rental" ? "service-card-footer no-price" : "service-card-footer"}>
+                {service.id !== "course" && service.id !== "rental" && (
+                  <strong>¥{service.price}/{unitLabels[service.unit] ?? service.unit}</strong>
+                )}
+                {service.id === "rental" ? (
+                  <Link className="primary-button service-action" to="/rental">
+                    去租赁 <ArrowRight size={16} />
+                  </Link>
+                ) : service.id === "course" ? (
+                  <a className="primary-button service-action" href="#courses">
+                    去预约 <ArrowRight size={16} />
+                  </a>
+                ) : (
+                  <Link className="primary-button service-action" to={`/payment?service=${service.id}`}>
+                    去支付 <ArrowRight size={16} />
+                  </Link>
+                )}
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="two-column">
+      <section className="two-column" id="courses">
         <div>
           <p className="eyebrow">课程</p>
           <h2>近期可约课程</h2>
@@ -73,7 +177,7 @@ export default function Home() {
                   <span>{course.coach} · {course.time}</span>
                 </div>
                 <div className="row-actions">
-                  <b>余 {course.seats}</b>
+                  <b>余 {course.remainingSeats}</b>
                   <Link className="detail-button" to={`/details/course/${course.id}`}>详情</Link>
                 </div>
               </div>

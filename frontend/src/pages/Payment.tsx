@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, QrCode, Smartphone, WalletCards } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { timeSlots, services as mockServices, courses as mockCourses, equipment as mockEquipment } from "../data/mock";
+import { timeSlots } from "../data/mock";
 
 type PaymentMethod = "wechat" | "alipay";
 
@@ -22,9 +22,9 @@ interface Course {
   seats: number;
   enrolled: number;
   price: number;
-  image: string;
-  intro: string;
-  highlights: string[];
+  image?: string;
+  intro?: string;
+  highlights?: string[];
   remainingSeats: number;
 }
 
@@ -70,6 +70,20 @@ const serviceLabels: Record<string, string> = {
   rental: "装备租赁"
 };
 
+const orderStatusLabels: Record<string, string> = {
+  pending_payment: "待支付",
+  paid: "已支付",
+  refund_reviewing: "退款审核中",
+  refunded: "已退款",
+  cancelled: "已取消"
+};
+
+const coursePlanLabels: Record<string, string> = {
+  "adult-basic": "一个月 10 节课，一天 3h",
+  "kids-summer": "一个月 20 节课，一天 2h",
+  advanced: "一个月 10 节课，一节课 4h"
+};
+
 function buildDateOptions(selectedDate: string) {
   const start = new Date("2026-05-09T00:00:00");
   const dates = Array.from({ length: 30 }, (_, index) => {
@@ -80,18 +94,28 @@ function buildDateOptions(selectedDate: string) {
   return dates.includes(selectedDate) ? dates : [selectedDate, ...dates];
 }
 
+function calculateLaneAmount(hours: number, people: number) {
+  const billableHours = Math.max(hours, 2);
+  return (40 + Math.max(billableHours - 2, 0) * 10) * people;
+}
+
 export default function Payment() {
   const [searchParams] = useSearchParams();
-  const initialServiceId = searchParams.get("service") ?? "lane";
+  const initialServiceId = searchParams.get("service") ?? searchParams.get("serviceId") ?? "lane";
   const itemType = searchParams.get("type");
   const itemId = searchParams.get("item");
   const existingOrderId = searchParams.get("orderId");
-  const rentalIdsParam = searchParams.get("rentalIds");
+  const rentalIdsParam = searchParams.get("rentalIds") ?? searchParams.get("rentals");
   const rentalQuantities: Record<string, number> = {};
+  const rentalIds: string[] = [];
   if (rentalIdsParam) {
-    rentalIdsParam.split(',').forEach(pair => {
+    rentalIdsParam.split(',').filter(Boolean).forEach(pair => {
       const [id, qty] = pair.split(':');
-      rentalQuantities[id] = parseInt(qty) || 0;
+      if (qty === undefined) {
+        rentalIds.push(id);
+      } else {
+        rentalQuantities[id] = parseInt(qty) || 0;
+      }
     });
   }
 
@@ -104,10 +128,11 @@ export default function Payment() {
   const service = initialServiceId === "rental" ? rentalService : services.find((item) => item.id === initialServiceId) ?? rentalService;
   const selectedCourse = itemType === "course" ? courses.find((item) => item.id === itemId) : undefined;
   const selectedEquipment = itemType === "equipment" ? equipment.find((item) => item.id === itemId) : undefined;
-  const queryRentalItems = Object.keys(rentalQuantities).map(id => equipment.find(item => item.id === id)).filter(Boolean) as Equipment[];
+  const queryRentalItems = rentalIds.map(id => equipment.find(item => item.id === id)).filter(Boolean) as Equipment[];
   const displayTitle = selectedCourse?.title ?? selectedEquipment?.name ?? service.name;
   const businessLabel = selectedEquipment ? "装备租赁" : service.name;
   const unitPrice = selectedCourse?.price ?? selectedEquipment?.price ?? service.price;
+  const coursePlanLabel = selectedCourse ? coursePlanLabels[selectedCourse.id] : "";
   const isMobileClient = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const [contactName, setContactName] = useState("张三");
@@ -115,21 +140,34 @@ export default function Payment() {
   const [date, setDate] = useState(searchParams.get("date") ?? "2026-05-12");
   const [slot, setSlot] = useState(searchParams.get("slot") ?? timeSlots[0]);
   const [people, setPeople] = useState(Number(searchParams.get("people") ?? 1));
-  const [hours, setHours] = useState(Number(searchParams.get("hours") ?? 1));
+  const [hours, setHours] = useState(Math.max(Number(searchParams.get("hours") ?? 2), 2));
   const [quantity, setQuantity] = useState(Number(searchParams.get("quantity") ?? 1));
   const [method, setMethod] = useState<PaymentMethod>("wechat");
-  const [status, setStatus] = useState<"idle" | "paying" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "paying" | "success" | "error" | "info">("idle");
   const [message, setMessage] = useState("");
   const [existingOrder, setExistingOrder] = useState<ExistingOrder | null>(null);
   const [existingBooking, setExistingBooking] = useState<ExistingBooking | null>(null);
+  const [showWechatReceiptCode, setShowWechatReceiptCode] = useState(false);
+  const [receiptCodeVersion, setReceiptCodeVersion] = useState(Date.now());
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const isExistingOrderPayable = !existingOrder || existingOrder.status === "pending_payment";
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Use mock data instead of API
-        setServices(mockServices.map(s => ({ ...s, capacityPerSlot: 4 })));
-        setCourses(mockCourses.map(c => ({ ...c, enrolled: 0, remainingSeats: c.seats })));
-        setEquipment(mockEquipment.map(e => ({ ...e, totalStock: e.stock, depositMode: "offline" as const })));
+        const [servicesResponse, coursesResponse, equipmentResponse] = await Promise.all([
+          fetch("/api/services"),
+          fetch("/api/courses"),
+          fetch("/api/equipment")
+        ]);
+        const [servicesResult, coursesResult, equipmentResult] = await Promise.all([
+          servicesResponse.json(),
+          coursesResponse.json(),
+          equipmentResponse.json()
+        ]);
+        setServices(servicesResult.data ?? []);
+        setCourses(coursesResult.data ?? []);
+        setEquipment(equipmentResult.data ?? []);
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -145,27 +183,34 @@ export default function Payment() {
       return;
     }
 
-    // Simulate fetching existing order
-    const mockOrder = { id: existingOrderId, amount: 100, status: "待支付" };
-    const mockBooking = {
-      id: "B" + Date.now(),
-      serviceId: "lane",
-      contactName: "张三",
-      phone: "13800138000",
-      date: "2026-05-12",
-      slot: "19:00-20:00",
-      people: 1,
-      hours: 1,
-      rentalIds: []
-    };
-    setExistingOrder(mockOrder);
-    setExistingBooking(mockBooking);
-    setContactName(mockBooking.contactName);
-    setPhone(mockBooking.phone);
-    setDate(mockBooking.date);
-    setSlot(mockBooking.slot);
-    setPeople(mockBooking.people);
-    setHours(mockBooking.hours);
+    fetch(`/api/orders/${existingOrderId}`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("订单不存在");
+        }
+        return response.json();
+      })
+      .then((result) => {
+        const order = result.data.order;
+        const booking = result.data.booking;
+        setExistingOrder(order);
+        setExistingBooking(booking);
+        if (order.status !== "pending_payment") {
+          setMessage(`订单当前为${orderStatusLabels[order.status] ?? order.status}，无需重复支付。`);
+        }
+        if (booking) {
+          setContactName(booking.contactName);
+          setPhone(booking.phone);
+          setDate(booking.date);
+          setSlot(booking.slot);
+          setPeople(booking.people);
+          setHours(booking.hours);
+        }
+      })
+      .catch((error) => {
+        setStatus("error");
+        setMessage(error instanceof Error ? error.message : "订单加载失败");
+      });
   }, [existingOrderId, loading]);
 
   const dateOptions = useMemo(() => buildDateOptions(date), [date]);
@@ -176,7 +221,7 @@ export default function Payment() {
         return sum + (equipment.find((item) => item.id === rentalId)?.price ?? 0);
       }, 0);
       if (existingBooking.serviceId === "lane") {
-        return 40 * people * hours + existingRentalTotal;
+        return calculateLaneAmount(hours, people) + existingRentalTotal;
       }
       if (existingBooking.serviceId === "course") {
         const course = courses.find((item) => item.id === existingBooking.courseId) ?? courses[0];
@@ -208,7 +253,7 @@ export default function Payment() {
     }
     const rentalTotal = queryRentalItems.reduce((sum, item) => sum + item.price, 0);
     if (service.id === "lane") {
-      return service.price * people * hours + rentalTotal;
+      return calculateLaneAmount(hours, people) + rentalTotal;
     }
     if (service.id === "private") {
       return service.price;
@@ -240,14 +285,23 @@ export default function Payment() {
       date: service.id === "rental" ? new Date().toISOString().slice(0, 10) : date,
       slot: service.id === "rental" ? "09:00-10:00" : slot,
       people: service.id === "rental" ? 1 : people,
-      hours: service.id === "rental" ? 1 : hours,
+      hours: service.id === "rental" ? 1 : Math.max(hours, service.id === "lane" ? 2 : 1),
       rentalIds
     };
   };
 
   const createPendingOrder = async () => {
-    // Simulate creating an order
-    const orderId = "O" + Date.now();
+    const response = await fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildBookingPayload())
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message ?? "创建订单失败");
+    }
+    const orderId = result.data.order.id as string;
+    setCreatedOrderId(orderId);
     return orderId;
   };
 
@@ -256,36 +310,95 @@ export default function Payment() {
       return existingOrderId;
     }
 
-    // Simulate updating the order
     return existingOrderId;
   };
 
+  const getPayableOrderId = async () => {
+    if (existingOrderId) {
+      return syncExistingOrder();
+    }
+    if (createdOrderId) {
+      return createdOrderId;
+    }
+    return createPendingOrder();
+  };
+
+  const showInsufficientInventoryMessage = (error: unknown) => {
+    const rawMessage = error instanceof Error ? error.message : "";
+    const isInventoryError = /不足|库存|余量|名额|容量/.test(rawMessage);
+    setStatus("error");
+    setMessage(isInventoryError ? "订单中有余量不足商品请重新选择商品" : rawMessage || "创建订单失败，请重新选择商品");
+  };
+
+  const payOrder = async (orderId: string) => {
+    const response = await fetch(`/api/orders/${orderId}/payments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message ?? "支付失败，请稍后重试");
+    }
+    return result.data.order.id as string;
+  };
+
   const handlePay = async () => {
+    if (existingOrder && existingOrder.status !== "pending_payment") {
+      setStatus("error");
+      setMessage(`订单当前为${orderStatusLabels[existingOrder.status] ?? existingOrder.status}，不可重复支付。`);
+      return;
+    }
+
+    if (method === "wechat") {
+      try {
+        const orderId = await getPayableOrderId();
+        if (!orderId) {
+          throw new Error("订单号缺失");
+        }
+        setShowWechatReceiptCode(true);
+        setReceiptCodeVersion(Date.now());
+        setStatus("info");
+        setMessage(showWechatReceiptCode ? "收款码已刷新，请使用微信扫描支付。" : "请使用微信扫描收款码完成支付。");
+      } catch (error) {
+        setShowWechatReceiptCode(false);
+        showInsufficientInventoryMessage(error);
+      }
+      return;
+    }
+
     setStatus("paying");
     setMessage(isMobileClient ? `正在请求${paymentLabels[method]}应用支付权限...` : `已生成${paymentLabels[method]}二维码，请扫码支付...`);
 
     try {
-      const orderId = existingOrderId ? await syncExistingOrder() : await createPendingOrder();
-      // Simulate payment
+      const orderId = await getPayableOrderId();
+      if (!orderId) {
+        throw new Error("订单号缺失");
+      }
+      await payOrder(orderId);
       setStatus("success");
       setMessage(`支付成功，订单号：${orderId}`);
+    } catch (error) {
+      showInsufficientInventoryMessage(error);
+    }
+  };
 
-      // Save order to localStorage
-      const orderType = selectedEquipment ? "装备租赁" : service.name;
-      const orderDate = service.id === "rental" ? new Date().toISOString().slice(0, 10) : date;
-      const newOrder = {
-        id: orderId,
-        type: orderType,
-        amount: total,
-        status: "已完成",
-        date: orderDate
-      };
-      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      existingOrders.push(newOrder);
-      localStorage.setItem('orders', JSON.stringify(existingOrders));
+  const handleWechatPaymentComplete = async () => {
+    setStatus("paying");
+    setMessage("正在确认支付结果...");
+
+    try {
+      const orderId = await getPayableOrderId();
+      if (!orderId) {
+        throw new Error("订单号缺失");
+      }
+      await payOrder(orderId);
+      setExistingOrder((current) => current ? { ...current, status: "paid" } : current);
+      setStatus("success");
+      setMessage(`支付成功，订单号：${orderId}`);
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "支付失败，请稍后重试");
+      setMessage(error instanceof Error ? error.message : "支付确认失败，请稍后重试");
     }
   };
 
@@ -297,20 +410,6 @@ export default function Payment() {
       const orderId = await createPendingOrder();
       setStatus("success");
       setMessage(`已生成待支付订单：${orderId}`);
-
-      // Save pending order to localStorage
-      const orderType = selectedEquipment ? "装备租赁" : service.name;
-      const orderDate = service.id === "rental" ? new Date().toISOString().slice(0, 10) : date;
-      const newOrder = {
-        id: orderId,
-        type: orderType,
-        amount: total,
-        status: "待支付",
-        date: orderDate
-      };
-      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      existingOrders.push(newOrder);
-      localStorage.setItem('orders', JSON.stringify(existingOrders));
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "创建待支付订单失败");
@@ -321,7 +420,7 @@ export default function Payment() {
     <div className="page compact-page">
       <section className="section-heading">
         <p className="eyebrow">在线支付</p>
-        <h1>{existingOrderId ? "继续支付订单" : displayTitle}</h1>
+        <h1>{existingOrderId && !isExistingOrderPayable ? "订单详情" : existingOrderId ? "继续支付订单" : displayTitle}</h1>
       </section>
 
       <div className="payment-layout">
@@ -360,10 +459,17 @@ export default function Payment() {
                   人数
                   <input min={1} type="number" value={people} onChange={(event) => setPeople(Number(event.target.value))} />
                 </label>
-                <label>
-                  时长
-                  <input min={1} type="number" value={hours} onChange={(event) => setHours(Number(event.target.value))} />
-                </label>
+                {service.id === "course" && selectedCourse ? (
+                  <div className="course-plan-note">
+                    <span>课程安排</span>
+                    <strong>{coursePlanLabel}</strong>
+                  </div>
+                ) : (
+                  <label>
+                    时长
+                    <input min={service.id === "lane" ? 2 : 1} type="number" value={hours} onChange={(event) => setHours(Math.max(Number(event.target.value), service.id === "lane" ? 2 : 1))} />
+                  </label>
+                )}
               </>
             )}
           </div>
@@ -373,6 +479,7 @@ export default function Payment() {
           <h2>支付确认</h2>
           <div className="price-line"><span>业务类型</span><strong>{existingBooking ? serviceLabels[existingBooking.serviceId] ?? existingBooking.serviceId : businessLabel}</strong></div>
           {existingOrderId && <div className="price-line"><span>订单号</span><strong>{existingOrderId}</strong></div>}
+          {existingOrder && <div className="price-line"><span>订单状态</span><strong>{orderStatusLabels[existingOrder.status] ?? existingOrder.status}</strong></div>}
           {!existingOrderId && (selectedCourse || selectedEquipment) && <div className="price-line"><span>项目名称</span><strong>{displayTitle}</strong></div>}
           {!existingOrderId && <div className="price-line"><span>单价</span><strong>¥{unitPrice}</strong></div>}
           {selectedEquipment && (
@@ -409,14 +516,27 @@ export default function Payment() {
           <div className="price-line"><span>支付金额</span><strong>¥{total}</strong></div>
           <div className="payment-methods" aria-label="选择支付方式">
             {(["wechat", "alipay"] as PaymentMethod[]).map((item) => (
-              <button className={method === item ? "payment-method selected" : "payment-method"} key={item} onClick={() => setMethod(item)}>
+              <button className={method === item ? "payment-method selected" : "payment-method"} key={item} onClick={() => {
+                setMethod(item);
+                setShowWechatReceiptCode(false);
+                setMessage("");
+                setStatus("idle");
+              }}>
                 {item === "wechat" ? <WalletCards size={20} /> : <CreditCard size={20} />}
                 <span>{paymentLabels[item]}</span>
               </button>
             ))}
           </div>
-          <div className="payment-channel">
-            {isMobileClient ? (
+          <div className={showWechatReceiptCode && method === "wechat" ? "payment-channel receipt-code-channel" : "payment-channel"}>
+            {showWechatReceiptCode && method === "wechat" ? (
+              <>
+                <img className="wechat-receipt-code" src={`/payments/wechat-receipt.jpg?v=${receiptCodeVersion}`} alt="微信收款码" />
+                <div>
+                  <strong>微信收款码支付</strong>
+                  <span>请打开微信扫一扫，付款后可到订单页查看状态。</span>
+                </div>
+              </>
+            ) : isMobileClient ? (
               <>
                 <Smartphone size={24} />
                 <div>
@@ -436,16 +556,21 @@ export default function Payment() {
               </>
             )}
           </div>
-          <button className="primary-button full" disabled={status === "paying"} onClick={handlePay}>
-            {status === "paying" ? "支付处理中..." : isMobileClient ? `唤起${paymentLabels[method]}` : `生成${paymentLabels[method]}二维码`}
+          <button className="primary-button full" disabled={status === "paying" || !isExistingOrderPayable} onClick={handlePay}>
+            {!isExistingOrderPayable ? "已完成支付" : status === "paying" ? "支付处理中..." : method === "wechat" && showWechatReceiptCode ? "刷新收款码" : isMobileClient ? `唤起${paymentLabels[method]}` : `生成${paymentLabels[method]}二维码`}
           </button>
+          {showWechatReceiptCode && method === "wechat" && isExistingOrderPayable && (
+            <button className="secondary-pay-button" disabled={status === "paying"} onClick={handleWechatPaymentComplete}>
+              我已完成支付
+            </button>
+          )}
           {!existingOrderId && (
             <button className="secondary-pay-button" disabled={status === "paying"} onClick={handlePayLater}>
               稍后支付
             </button>
           )}
           {message && (
-            <div className={status === "success" ? "payment-result success" : "payment-result error"}>
+            <div className={status === "success" || status === "info" ? "payment-result success" : "payment-result error"}>
               {status === "success" && <CheckCircle2 size={18} />}
               <span>{message}</span>
             </div>

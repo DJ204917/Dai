@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-import { orders as mockOrders } from "../data/mock";
 
 interface Order {
   id: string;
   bookingId: string;
   amount: number;
   status: string;
+  createdAt: string;
 }
 
 interface Booking {
@@ -15,6 +15,11 @@ interface Booking {
   serviceId: string;
   date: string;
   slot: string;
+}
+
+interface OrderRow {
+  order: Order;
+  booking?: Booking;
 }
 
 const statusLabels: Record<string, string> = {
@@ -32,23 +37,73 @@ const typeLabels: Record<string, string> = {
   rental: "装备租赁"
 };
 
+const statusPriority: Record<string, number> = {
+  pending_payment: 0,
+  paid: 1,
+  refund_reviewing: 2,
+  refunded: 3,
+  cancelled: 4
+};
+
+function formatBeijingDateTime(value?: string) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(new Date(value));
+}
+
 export default function Orders() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      // Load orders from localStorage and merge with mock
-      const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      const allOrders = [...mockOrders, ...localOrders];
-      setOrders(allOrders);
-      setError(null);
-    } catch (err) {
-      setError('加载订单失败');
-    } finally {
-      setLoading(false);
-    }
+    const loadOrders = async () => {
+      try {
+        const response = await fetch("/api/orders");
+        if (!response.ok) {
+          throw new Error("订单接口请求失败");
+        }
+        const result = await response.json();
+        const rows = await Promise.all(
+          (result.data ?? []).map(async (order: Order) => {
+            const detailResponse = await fetch(`/api/orders/${order.id}`);
+            if (!detailResponse.ok) {
+              return { order };
+            }
+            const detailResult = await detailResponse.json();
+            return {
+              order: detailResult.data.order,
+              booking: detailResult.data.booking
+            };
+          })
+        );
+        setOrders(rows.sort((left, right) => {
+          const leftPriority = statusPriority[left.order.status] ?? 99;
+          const rightPriority = statusPriority[right.order.status] ?? 99;
+          if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+          }
+          return new Date(right.order.createdAt).getTime() - new Date(left.order.createdAt).getTime();
+        }));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "加载订单失败");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrders();
   }, []);
 
   return (
@@ -65,17 +120,19 @@ export default function Orders() {
         ) : (
           <div className="table">
             <div className="table-head">
-              <span>订单号</span><span>类型</span><span>时间</span><span>金额</span><span>状态</span><span>操作</span>
+              <span>订单号</span><span>类型</span><span>下单时间</span><span>金额</span><span>状态</span><span>操作</span>
             </div>
-            {orders.map((order) => {
-              const isPending = order.status === "待支付";
+            {orders.map(({ order, booking }) => {
+              const isPending = order.status === "pending_payment";
+              const statusLabel = statusLabels[order.status] ?? order.status;
+              const typeLabel = booking ? typeLabels[booking.serviceId] ?? booking.serviceId : "-";
               return (
                 <div className="table-row" key={order.id}>
                   <span>{order.id}</span>
-                  <span>{order.type}</span>
-                  <span>{order.date}</span>
+                  <span>{typeLabel}</span>
+                  <span>{formatBeijingDateTime(order.createdAt)}</span>
                   <span>¥{order.amount}</span>
-                  <span className="status">{order.status}</span>
+                  <span className="status">{statusLabel}</span>
                   {isPending ? (
                     <Link className="table-action primary" to={`/payment?orderId=${order.id}`}>
                       <CreditCard size={16} /> 去支付

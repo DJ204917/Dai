@@ -1,23 +1,74 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { equipment, services, timeSlots } from "../data/mock";
+import { timeSlots } from "../data/mock";
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  capacityPerSlot: number;
+  description: string;
+}
+
+interface Equipment {
+  id: string;
+  name: string;
+  price: number;
+  deposit: number;
+  stock: number;
+}
+
+function calculateLaneAmount(hours: number, people: number) {
+  const billableHours = Math.max(hours, 2);
+  return (40 + Math.max(billableHours - 2, 0) * 10) * people;
+}
 
 export default function Booking() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [serviceId, setServiceId] = useState("lane");
   const [people, setPeople] = useState(2);
-  const [hours, setHours] = useState(1);
+  const [hours] = useState(2);
   const [slot, setSlot] = useState(timeSlots[0]);
   const [date, setDate] = useState("2026-05-10");
-  const [rentals, setRentals] = useState<string[]>(["goggles"]);
+  const [rentalQuantities, setRentalQuantities] = useState<Record<string, number>>({ goggles: 1 });
 
-  const service = services.find((item) => item.id === serviceId) ?? services[0];
-  const rentalTotal = equipment.filter((item) => rentals.includes(item.id)).reduce((sum, item) => sum + item.price, 0);
-  const bookingTotal = useMemo(() => service.price * (service.id === "lane" ? hours : people), [hours, people, service]);
+  useEffect(() => {
+    const loadCatalog = async () => {
+      const [servicesResponse, equipmentResponse] = await Promise.all([
+        fetch("/api/services"),
+        fetch("/api/equipment")
+      ]);
+      const [servicesResult, equipmentResult] = await Promise.all([
+        servicesResponse.json(),
+        equipmentResponse.json()
+      ]);
+      setServices(servicesResult.data ?? []);
+      setEquipment(equipmentResult.data ?? []);
+    };
+
+    loadCatalog().catch((error) => {
+      console.error("Failed to load booking catalog", error);
+    });
+  }, []);
+
+  const service = services.find((item) => item.id === serviceId) ?? services[0] ?? { id: "lane", name: "泳道预约", price: 0, unit: "hour", capacityPerSlot: 0, description: "" };
+  const rentalTotal = equipment.reduce((sum, item) => sum + item.price * (rentalQuantities[item.id] ?? 0), 0);
+  const bookingTotal = useMemo(() => service.id === "lane" ? calculateLaneAmount(hours, people) : service.price * people, [hours, people, service]);
   const total = bookingTotal + rentalTotal;
+  const rentalParam = equipment
+    .filter((item) => (rentalQuantities[item.id] ?? 0) > 0)
+    .map((item) => `${item.id}:${rentalQuantities[item.id]}`)
+    .join(",");
 
-  const toggleRental = (id: string) => {
-    setRentals((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const updateRentalQuantity = (item: Equipment, quantity: number) => {
+    const nextQuantity = Math.min(Math.max(quantity, 0), item.stock);
+    setRentalQuantities((current) => ({
+      ...current,
+      [item.id]: nextQuantity
+    }));
   };
 
   return (
@@ -53,10 +104,6 @@ export default function Booking() {
               人数
               <input min={1} type="number" value={people} onChange={(event) => setPeople(Number(event.target.value))} />
             </label>
-            <label>
-              时长
-              <input min={1} type="number" value={hours} onChange={(event) => setHours(Number(event.target.value))} />
-            </label>
           </div>
         </section>
 
@@ -64,10 +111,24 @@ export default function Booking() {
           <h2>是否租赁装备</h2>
           <div className="rental-picker">
             {equipment.map((item) => (
-              <button className={rentals.includes(item.id) ? "rental selected" : "rental"} key={item.id} onClick={() => toggleRental(item.id)}>
-                <span>{item.name}</span>
-                <small>¥{item.price}/次 · 库存 {item.stock}</small>
-              </button>
+              <div className={(rentalQuantities[item.id] ?? 0) > 0 ? "rental selected rental-with-quantity" : "rental rental-with-quantity"} key={item.id}>
+                <div>
+                  <span>{item.name}</span>
+                  <small>¥{item.price}/次 · 库存 {item.stock}</small>
+                </div>
+                <div className="rental-quantity">
+                  <button type="button" onClick={() => updateRentalQuantity(item, (rentalQuantities[item.id] ?? 0) - 1)}>-</button>
+                  <input
+                    min={0}
+                    max={item.stock}
+                    type="number"
+                    value={rentalQuantities[item.id] ?? 0}
+                    onChange={(event) => updateRentalQuantity(item, Number(event.target.value))}
+                  />
+                  <button type="button" onClick={() => updateRentalQuantity(item, (rentalQuantities[item.id] ?? 0) + 1)}>+</button>
+                  <strong>¥{item.price * (rentalQuantities[item.id] ?? 0)}</strong>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -78,7 +139,7 @@ export default function Booking() {
           <div className="price-line"><span>服务费用</span><strong>¥{bookingTotal}</strong></div>
           <div className="price-line"><span>装备租赁</span><strong>¥{rentalTotal}</strong></div>
           <div className="price-line total"><span>合计</span><strong>¥{total}</strong></div>
-          <Link className="primary-button full" to={`/payment?service=${serviceId}&date=${date}&slot=${encodeURIComponent(slot)}&people=${people}&hours=${hours}&rentals=${rentals.join(",")}`}>
+          <Link className="primary-button full" to={`/payment?service=${serviceId}&date=${date}&slot=${encodeURIComponent(slot)}&people=${people}&hours=${hours}&rentals=${rentalParam}`}>
             提交预约并支付
           </Link>
           <small>提交后可通过短信和站内信发送预约编号、地点和注意事项。</small>

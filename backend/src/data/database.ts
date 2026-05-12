@@ -52,6 +52,14 @@ db.exec(`
     points INTEGER DEFAULT 0
   );
 
+  CREATE TABLE IF NOT EXISTS members (
+    id TEXT PRIMARY KEY,
+    account TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_login_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS bookings (
     id TEXT PRIMARY KEY,
     service_id TEXT NOT NULL,
@@ -66,6 +74,7 @@ db.exec(`
     status TEXT NOT NULL,
     amount INTEGER NOT NULL,
     notes TEXT,
+    member_account TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (service_id) REFERENCES services(id)
@@ -111,6 +120,11 @@ db.prepare(`
   WHERE created_at IS NULL
 `).run();
 
+const bookingColumns = db.prepare(`PRAGMA table_info(bookings)`).all();
+if (!bookingColumns.some((column: any) => column.name === 'member_account')) {
+  db.prepare(`ALTER TABLE bookings ADD COLUMN member_account TEXT`).run();
+}
+
 // Insert initial data
 const insertService = db.prepare(`
   INSERT OR IGNORE INTO services (id, name, price, unit, capacity_per_slot, description)
@@ -133,8 +147,8 @@ const insertUser = db.prepare(`
 `);
 
 const insertBooking = db.prepare(`
-  INSERT OR IGNORE INTO bookings (id, service_id, course_id, contact_name, phone, date, slot, people, hours, rental_ids, status, amount, notes, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT OR IGNORE INTO bookings (id, service_id, course_id, contact_name, phone, date, slot, people, hours, rental_ids, status, amount, notes, member_account, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const insertOrder = db.prepare(`
@@ -168,7 +182,7 @@ insertEquipment.run('dry-bag', '防水袋', 10, 20, 20, 20, '可放手机和小�
 insertUser.run('U10001', '示例会员', '13800000000', 'M20260509001', 120);
 
 // Bookings
-insertBooking.run('B20260509001', 'lane', null, '示例会员', '13800000000', '2026-05-10', '19:00-20:00', 2, 1, '["goggles","cap"]', 'confirmed', 98, null, '2026-05-09T08:00:00.000Z', '2026-05-09T08:05:00.000Z');
+insertBooking.run('B20260509001', 'lane', null, '示例会员', '13800000000', '2026-05-10', '19:00-20:00', 2, 1, '["goggles","cap"]', 'confirmed', 98, null, null, '2026-05-09T08:00:00.000Z', '2026-05-09T08:05:00.000Z');
 
 // Orders
 insertOrder.run('O20260509001', 'B20260509001', 98, 'paid', 'wechat', '[{"label":"泳道预约 1小时","amount":80},{"label":"防雾泳镜租赁","amount":12},{"label":"硅胶泳帽租赁","amount":6}]', '2026-05-09T08:05:00.000Z', '2026-05-09T08:00:00.000Z');

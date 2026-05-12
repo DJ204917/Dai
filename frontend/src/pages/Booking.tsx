@@ -25,14 +25,20 @@ function calculateLaneAmount(hours: number, people: number) {
   return (40 + Math.max(billableHours - 2, 0) * 10) * people;
 }
 
+function getLocalDateValue(date = new Date()) {
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
 export default function Booking() {
+  const today = getLocalDateValue();
   const [services, setServices] = useState<Service[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [serviceId, setServiceId] = useState("lane");
   const [people, setPeople] = useState(2);
   const [hours] = useState(2);
   const [slot, setSlot] = useState(timeSlots[0]);
-  const [date, setDate] = useState("2026-05-10");
+  const [date, setDate] = useState(today);
   const [rentalQuantities, setRentalQuantities] = useState<Record<string, number>>({ goggles: 1 });
 
   useEffect(() => {
@@ -55,8 +61,17 @@ export default function Booking() {
   }, []);
 
   const service = services.find((item) => item.id === serviceId) ?? services[0] ?? { id: "lane", name: "泳道预约", price: 0, unit: "hour", capacityPerSlot: 0, description: "" };
-  const rentalTotal = equipment.reduce((sum, item) => sum + item.price * (rentalQuantities[item.id] ?? 0), 0);
-  const bookingTotal = useMemo(() => service.id === "lane" ? calculateLaneAmount(hours, people) : service.price * people, [hours, people, service]);
+  const shouldChargeRentals = service.id !== "private";
+  const rentalTotal = shouldChargeRentals ? equipment.reduce((sum, item) => sum + item.price * (rentalQuantities[item.id] ?? 0), 0) : 0;
+  const bookingTotal = useMemo(() => {
+    if (service.id === "lane") {
+      return calculateLaneAmount(hours, people);
+    }
+    if (service.id === "private") {
+      return service.price;
+    }
+    return service.price * people;
+  }, [hours, people, service]);
   const total = bookingTotal + rentalTotal;
   const rentalParam = equipment
     .filter((item) => (rentalQuantities[item.id] ?? 0) > 0)
@@ -92,7 +107,7 @@ export default function Booking() {
           <div className="form-grid">
             <label>
               日期
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+              <input min={today} type="date" value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
             <label>
               时间段
@@ -126,7 +141,7 @@ export default function Booking() {
                     onChange={(event) => updateRentalQuantity(item, Number(event.target.value))}
                   />
                   <button type="button" onClick={() => updateRentalQuantity(item, (rentalQuantities[item.id] ?? 0) + 1)}>+</button>
-                  <strong>¥{item.price * (rentalQuantities[item.id] ?? 0)}</strong>
+                  <strong>¥{shouldChargeRentals ? item.price * (rentalQuantities[item.id] ?? 0) : 0}</strong>
                 </div>
               </div>
             ))}

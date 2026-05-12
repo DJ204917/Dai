@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CreditCard, FileText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Ban, CreditCard, FileText, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface Order {
@@ -65,46 +65,76 @@ export default function Orders() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionStatus, setActionStatus] = useState<"success" | "error">("success");
+
+  const loadOrders = async () => {
+    try {
+      const response = await fetch("/api/orders");
+      if (!response.ok) {
+        throw new Error("订单接口请求失败");
+      }
+      const result = await response.json();
+      const rows = await Promise.all(
+        (result.data ?? []).map(async (order: Order) => {
+          const detailResponse = await fetch(`/api/orders/${order.id}`);
+          if (!detailResponse.ok) {
+            return { order };
+          }
+          const detailResult = await detailResponse.json();
+          return {
+            order: detailResult.data.order,
+            booking: detailResult.data.booking
+          };
+        })
+      );
+      setOrders(rows.sort((left, right) => {
+        const leftPriority = statusPriority[left.order.status] ?? 99;
+        const rightPriority = statusPriority[right.order.status] ?? 99;
+        if (leftPriority !== rightPriority) {
+          return leftPriority - rightPriority;
+        }
+        return new Date(right.order.createdAt).getTime() - new Date(left.order.createdAt).getTime();
+      }));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载订单失败");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const response = await fetch("/api/orders");
-        if (!response.ok) {
-          throw new Error("订单接口请求失败");
-        }
-        const result = await response.json();
-        const rows = await Promise.all(
-          (result.data ?? []).map(async (order: Order) => {
-            const detailResponse = await fetch(`/api/orders/${order.id}`);
-            if (!detailResponse.ok) {
-              return { order };
-            }
-            const detailResult = await detailResponse.json();
-            return {
-              order: detailResult.data.order,
-              booking: detailResult.data.booking
-            };
-          })
-        );
-        setOrders(rows.sort((left, right) => {
-          const leftPriority = statusPriority[left.order.status] ?? 99;
-          const rightPriority = statusPriority[right.order.status] ?? 99;
-          if (leftPriority !== rightPriority) {
-            return leftPriority - rightPriority;
-          }
-          return new Date(right.order.createdAt).getTime() - new Date(left.order.createdAt).getTime();
-        }));
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "加载订单失败");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadOrders();
   }, []);
+
+  const updateOrder = async (orderId: string, action: "cancel" | "refund-requests") => {
+    try {
+      setActionMessage("");
+      setActionStatus("success");
+      const response = await fetch(`/api/orders/${orderId}/${action}`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message ?? "操作失败");
+      }
+      setActionMessage(action === "refund-requests" ? "订单退款已申请，等待处理" : "订单已取消，商品余量已返还");
+      setOrders((current) => current.map((row) => (
+        row.order.id === orderId
+          ? {
+            ...row,
+            order: {
+              ...row.order,
+              status: action === "refund-requests" ? "refund_reviewing" : "cancelled"
+            }
+          }
+          : row
+      )));
+      await loadOrders();
+    } catch (err) {
+      setActionStatus("error");
+      setActionMessage(err instanceof Error ? err.message : "操作失败");
+    }
+  };
 
   return (
     <div className="page compact-page">
@@ -113,6 +143,7 @@ export default function Orders() {
         <h1>历史订单、待支付和发票申请</h1>
       </section>
       <section className="panel">
+        {actionMessage && <div className={actionStatus === "success" ? "payment-result success" : "payment-result error"}>{actionMessage}</div>}
         {loading ? (
           <p>订单加载中...</p>
         ) : error ? (
@@ -134,9 +165,24 @@ export default function Orders() {
                   <span>¥{order.amount}</span>
                   <span className="status">{statusLabel}</span>
                   {isPending ? (
-                    <Link className="table-action primary" to={`/payment?orderId=${order.id}`}>
-                      <CreditCard size={16} /> 去支付
-                    </Link>
+                    <div className="table-actions">
+                      <Link className="table-action primary" to={`/payment?orderId=${order.id}`}>
+                        <CreditCard size={16} /> 去支付
+                      </Link>
+                      <button onClick={() => updateOrder(order.id, "cancel")} type="button">
+                        <Ban size={16} /> 取消
+                      </button>
+                    </div>
+                  ) : order.status === "paid" ? (
+                    <button onClick={() => updateOrder(order.id, "refund-requests")} type="button">
+                      <RotateCcw size={16} /> 申请退款
+                    </button>
+                  ) : order.status === "cancelled" ? (
+                    <span className="status">订单已取消</span>
+                  ) : order.status === "refund_reviewing" ? (
+                    <span className="status">订单退款已申请，等待处理</span>
+                  ) : order.status === "refunded" ? (
+                    <span className="status">退款成功</span>
                   ) : (
                     <button><FileText size={16} /> 发票</button>
                   )}

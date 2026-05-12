@@ -55,6 +55,7 @@ export interface Booking {
   status: BookingStatus;
   amount: number;
   notes?: string;
+  memberAccount?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,6 +86,14 @@ export interface User {
   phone: string;
   memberCardNo?: string;
   points: number;
+}
+
+export interface Member {
+  id: string;
+  account: string;
+  passwordHash: string;
+  createdAt: string;
+  lastLoginAt?: string;
 }
 
 export const timeSlots = ["09:00-10:00", "10:00-11:00", "14:00-15:00", "16:00-17:00", "19:00-20:00", "20:00-21:00"];
@@ -168,6 +177,24 @@ export function updateEquipmentStock(id: string, newStock: number): void {
   db.prepare('UPDATE equipment SET stock = ? WHERE id = ?').run(newStock, id);
 }
 
+export function createEquipment(input: Omit<Equipment, 'id'>): Equipment {
+  const id = `E${Date.now()}`;
+  db.prepare(`
+    INSERT INTO equipment (id, name, price, deposit, stock, total_stock, description, deposit_mode)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    input.name,
+    input.price,
+    input.deposit,
+    input.stock,
+    input.totalStock,
+    input.description,
+    input.depositMode
+  );
+  return { id, ...input };
+}
+
 function countRentalIds(rentalIds: string[]): Record<string, number> {
   return rentalIds.reduce<Record<string, number>>((counts, id) => {
     counts[id] = (counts[id] || 0) + 1;
@@ -218,6 +245,38 @@ export function getUsers(): User[] {
   }));
 }
 
+function mapMember(row: any): Member {
+  return {
+    id: row.id,
+    account: row.account,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+    lastLoginAt: row.last_login_at
+  };
+}
+
+export function getMemberByAccount(account: string): Member | undefined {
+  const row = db.prepare('SELECT * FROM members WHERE account = ?').get(account);
+  return row ? mapMember(row) : undefined;
+}
+
+export function createMember(account: string, passwordHash: string): Member {
+  const id = `M${Date.now()}`;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO members (id, account, password_hash, created_at, last_login_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, account, passwordHash, now, null);
+  return { id, account, passwordHash, createdAt: now };
+}
+
+export function updateMemberLastLogin(id: string): Member | undefined {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE members SET last_login_at = ? WHERE id = ?').run(now, id);
+  const row = db.prepare('SELECT * FROM members WHERE id = ?').get(id);
+  return row ? mapMember(row) : undefined;
+}
+
 export function getBookings(): Booking[] {
   const rows = db.prepare('SELECT * FROM bookings').all();
   return rows.map((row: any) => ({
@@ -234,6 +293,7 @@ export function getBookings(): Booking[] {
     status: row.status as BookingStatus,
     amount: row.amount,
     notes: row.notes,
+    memberAccount: row.member_account,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }));
@@ -256,6 +316,7 @@ export function getBookingById(id: string): Booking | undefined {
     status: row.status as BookingStatus,
     amount: row.amount,
     notes: row.notes,
+    memberAccount: row.member_account,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -265,8 +326,8 @@ export function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updat
   const id = `B${Date.now()}`;
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO bookings (id, service_id, course_id, contact_name, phone, date, slot, people, hours, rental_ids, status, amount, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO bookings (id, service_id, course_id, contact_name, phone, date, slot, people, hours, rental_ids, status, amount, notes, member_account, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     booking.serviceId,
@@ -281,6 +342,7 @@ export function createBooking(booking: Omit<Booking, 'id' | 'createdAt' | 'updat
     booking.status,
     booking.amount,
     booking.notes,
+    booking.memberAccount,
     now,
     now
   );

@@ -84,6 +84,8 @@ const coursePlanLabels: Record<string, string> = {
   advanced: "一个月 10 节课，一节课 4h"
 };
 
+const EQUIPMENT_DEPOSIT = 20;
+
 function buildDateOptions(selectedDate: string) {
   const start = new Date("2026-05-09T00:00:00");
   const dates = Array.from({ length: 30 }, (_, index) => {
@@ -134,6 +136,7 @@ export default function Payment() {
   const unitPrice = selectedCourse?.price ?? selectedEquipment?.price ?? service.price;
   const coursePlanLabel = selectedCourse ? coursePlanLabels[selectedCourse.id] : "";
   const isMobileClient = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const isPrivateService = service.id === "private";
 
   const [contactName, setContactName] = useState("张三");
   const [phone, setPhone] = useState("13800138000");
@@ -246,10 +249,20 @@ export default function Payment() {
       return selectedEquipment.price * quantity;
     }
     if (Object.keys(rentalQuantities).length > 0) {
-      return Object.entries(rentalQuantities).reduce((sum, [id, qty]) => {
+      const rentalTotal = isPrivateService ? 0 : Object.entries(rentalQuantities).reduce((sum, [id, qty]) => {
         const item = equipment.find(e => e.id === id);
         return sum + (item?.price ?? 0) * qty;
       }, 0);
+      if (service.id === "lane") {
+        return calculateLaneAmount(hours, people) + rentalTotal;
+      }
+      if (service.id === "private") {
+        return service.price;
+      }
+      if (service.id === "rental") {
+        return rentalTotal;
+      }
+      return service.price * people + rentalTotal;
     }
     const rentalTotal = queryRentalItems.reduce((sum, item) => sum + item.price, 0);
     if (service.id === "lane") {
@@ -259,7 +272,7 @@ export default function Payment() {
       return service.price;
     }
     return service.price * people;
-  }, [existingBooking, existingOrder, hours, people, quantity, queryRentalItems, selectedCourse, selectedEquipment, service]);
+  }, [existingBooking, existingOrder, hours, people, quantity, queryRentalItems, selectedCourse, selectedEquipment, service, isPrivateService]);
 
   const buildBookingPayload = () => {
     const rentalIds: string[] = [];
@@ -286,7 +299,8 @@ export default function Payment() {
       slot: service.id === "rental" ? "09:00-10:00" : slot,
       people: service.id === "rental" ? 1 : people,
       hours: service.id === "rental" ? 1 : Math.max(hours, service.id === "lane" ? 2 : 1),
-      rentalIds
+      rentalIds,
+      memberAccount: JSON.parse(localStorage.getItem("member") || "null")?.account
     };
   };
 
@@ -487,7 +501,7 @@ export default function Payment() {
               <div className="price-line"><span>数量</span><strong>{quantity}</strong></div>
               <div className="price-line"><span>租金总价</span><strong>¥{selectedEquipment.price * quantity}</strong></div>
               <div className="deposit-info">
-                <div className="price-line"><span>押金（线下支付）</span><strong>¥{selectedEquipment.deposit * quantity}</strong></div>
+                <div className="price-line"><span>押金（线下支付）</span><strong>¥{EQUIPMENT_DEPOSIT * quantity}</strong></div>
                 <p className="deposit-note">⚠️ 押金需要线下支付</p>
               </div>
             </>
@@ -501,16 +515,15 @@ export default function Payment() {
               <ul>
                 {Object.entries(rentalQuantities).map(([id, qty]) => {
                   const item = equipment.find(e => e.id === id);
-                  return item ? <li key={id}>{item.name} x {qty} = 租金 ¥{item.price * qty}</li> : null;
+                  return item ? <li key={id}>{item.name} x {qty} = 租金 ¥{isPrivateService ? 0 : item.price * qty}</li> : null;
                 })}
               </ul>
-              <div className="deposit-info">
-                <div className="price-line"><span>押金（线下支付）</span><strong>¥{Object.entries(rentalQuantities).reduce((sum, [id, qty]) => {
-                  const item = equipment.find(e => e.id === id);
-                  return sum + (item?.deposit ?? 0) * qty;
-                }, 0)}</strong></div>
-                <p className="deposit-note">⚠️ 押金需要线下支付</p>
-              </div>
+              {!isPrivateService && (
+                <div className="deposit-info">
+                  <div className="price-line"><span>押金（线下支付）</span><strong>¥{Object.values(rentalQuantities).reduce((sum, qty) => sum + EQUIPMENT_DEPOSIT * qty, 0)}</strong></div>
+                  <p className="deposit-note">⚠️ 押金需要线下支付</p>
+                </div>
+              )}
             </div>
           )}
           <div className="price-line"><span>支付金额</span><strong>¥{total}</strong></div>

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getBookings, getOrderById, getOrders, updateBooking, updateOrder } from "../data/store.js";
+import { getBookings, getOrderById, getOrders, restoreBookingInventory, updateBooking, updateOrder } from "../data/store.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
@@ -96,6 +96,26 @@ router.post("/:orderId/refund-requests", (req, res) => {
   });
 });
 
+router.post("/:orderId/cancel", (req, res) => {
+  const order = getOrderById(req.params.orderId);
+  if (!order) {
+    throw new AppError(404, "订单不存在");
+  }
+  if (order.status !== "pending_payment") {
+    throw new AppError(409, "只有待支付订单可以取消");
+  }
+
+  const bookings = getBookings();
+  const booking = bookings.find((item) => item.id === order.bookingId);
+  if (booking) {
+    restoreBookingInventory(booking);
+    updateBooking(booking.id, { status: "cancelled" });
+  }
+
+  const updatedOrder = updateOrder(order.id, { status: "cancelled" });
+  res.json({ data: { order: updatedOrder, booking } });
+});
+
 router.post("/:orderId/refund-approve", (req, res) => {
   const order = getOrderById(req.params.orderId);
   if (!order) {
@@ -114,6 +134,7 @@ router.post("/:orderId/refund-approve", (req, res) => {
   const bookings = getBookings();
   const booking = bookings.find((item) => item.id === order.bookingId);
   if (booking) {
+    restoreBookingInventory(booking);
     updateBooking(booking.id, { status: "cancelled" });
   }
 

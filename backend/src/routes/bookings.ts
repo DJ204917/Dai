@@ -15,6 +15,7 @@ const createBookingSchema = z.object({
   people: z.number().int().positive(),
   hours: z.number().int().positive().default(1),
   rentalIds: z.array(z.string()).default([]),
+  memberAccount: z.string().optional(),
   notes: z.string().optional()
 });
 
@@ -105,7 +106,7 @@ function buildFeeItems(input: z.infer<typeof createBookingSchema>) {
     if (item.stock < count) {
       throw new AppError(409, `${item.name}库存不足，需要${count}件，剩余${item.stock}件`);
     }
-    feeItems.push({ label: `${item.name}租赁 x ${count}`, amount: item.price * count });
+    feeItems.push({ label: `${item.name}租赁 x ${count}`, amount: input.serviceId === "private" ? 0 : item.price * count });
   }
 
   return feeItems;

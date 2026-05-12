@@ -4,6 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import adminRouter from "./routes/admin.js";
+import authRouter from "./routes/auth.js";
 import bookingsRouter from "./routes/bookings.js";
 import catalogRouter from "./routes/catalog.js";
 import ordersRouter from "./routes/orders.js";
@@ -30,6 +31,10 @@ const apiModules = {
     "GET /api/courses/:courseId",
     "GET /api/equipment",
     "GET /api/content/contact"
+  ],
+  auth: [
+    "POST /api/auth/register",
+    "POST /api/auth/login"
   ],
   bookings: [
     "GET /api/bookings",
@@ -110,6 +115,7 @@ app.get("/api", (req, res) => {
 });
 
 app.use("/api", catalogRouter);
+app.use("/api/auth", authRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/admin", adminRouter);

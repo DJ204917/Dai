@@ -43,9 +43,55 @@ a {
   backdrop-filter: blur(16px);
 }
 
+.admin-shell {
+  background: #eef3f0;
+}
+
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px clamp(18px, 4vw, 52px);
+  background: #102327;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(7, 32, 35, 0.16);
+}
+
+.admin-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+}
+
+.admin-brand div {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-brand strong {
+  font-size: 18px;
+}
+
+.admin-brand span:not(.brand-mark) {
+  color: #b9c9c8;
+  font-size: 13px;
+}
+
+.admin-header .member-chip {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .brand,
 .main-nav a,
 .hotline,
+.member-chip,
 .primary-button,
 .secondary-button {
   display: inline-flex;
@@ -95,6 +141,18 @@ a {
   color: #0f5b58;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.member-chip {
+  min-height: 38px;
+  padding: 8px 11px;
+  color: #0f5b58;
+  font-weight: 800;
+  white-space: nowrap;
+  background: #edf6f3;
+  border: 1px solid #d8e7df;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 main {
@@ -902,6 +960,32 @@ select {
     repeating-linear-gradient(45deg, #deebe3, #deebe3 12px, #eef5ee 12px, #eef5ee 24px);
 }
 
+.auth-page {
+  max-width: 720px;
+}
+
+.auth-panel {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.auth-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .stat-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -912,12 +996,57 @@ select {
   padding: 18px;
 }
 
+.stat-card.danger {
+  color: #7f1d1d;
+  background: #fff1f1;
+  border-color: #f1b4b4;
+}
+
 .stat-card svg {
   color: #0a7772;
 }
 
 .stat-card strong {
   font-size: 28px;
+}
+
+.admin-detail-panel {
+  margin-top: 18px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-list-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: #f8fbf8;
+  border: 1px solid #dfe8e0;
+  border-radius: 8px;
+}
+
+.admin-list-row span {
+  color: #526164;
+}
+
+.admin-list-row.danger {
+  color: #7f1d1d;
+  background: #fff1f1;
+  border-color: #f1b4b4;
+}
+
+.admin-list-row.danger span {
+  color: #9f3434;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .admin-modules {
@@ -968,7 +1097,8 @@ select {
   }
 
   .main-nav a span,
-  .hotline span {
+  .hotline span,
+  .member-chip span {
     display: none;
   }
 

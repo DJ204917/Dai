@@ -29,15 +29,17 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
+        working-directory: ./frontend
         run: npm install
 
       - name: Build
+        working-directory: ./frontend
         run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ./dist
+          path: ./frontend/dist
 
   deploy:
     environment:

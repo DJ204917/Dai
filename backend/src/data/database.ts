@@ -189,10 +189,10 @@ insertOrder.run('O20260509001', 'B20260509001', 98, 'paid', 'wechat', '[{"label"
 
 // Site content
 insertSiteContent.run('shopName', '迪爱泳馆');
-insertSiteContent.run('phone', '400-800-6688');
+insertSiteContent.run('phone', '18224358955');
 insertSiteContent.run('workTime', '周一至周日 08:00 - 22:00');
 insertSiteContent.run('address', '北京市朝阳区建国路88号现代城A座1层');
-insertSiteContent.run('email', 'service@daiai.com');
+insertSiteContent.run('email', '1986144233@qq.com');
 
 console.log('Database initialized successfully');
 

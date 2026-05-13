@@ -17,8 +17,8 @@ export default function Contact() {
       </section>
       <div className="two-column">
         <section className="panel contact-list">
-          <p><Phone size={20} /> 400-800-6688</p>
-          <p><Mail size={20} /> service@daiai-swim.example</p>
+          <p><Phone size={20} /> 18224358955</p>
+          <p><Mail size={20} /> 1986144233@qq.com</p>
           <p><MapPinned size={20} /> 四川省成都市犀浦地铁站</p>
           <p><Navigation size={20} /> 点击右侧导航到犀浦地铁站</p>
         </section>

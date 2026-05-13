@@ -81,9 +81,9 @@ export default function App() {
               );
             })}
           </nav>
-          <a className="hotline" href="tel:400-800-6688">
+          <a className="hotline" href="tel:18224358955">
             <Phone size={18} />
-            <span>400-800-6688</span>
+            <span>18224358955</span>
           </a>
           {member ? (
             <button className="member-chip" onClick={handleLogout} type="button" title="点击退出登录">
@@ -116,8 +116,8 @@ export default function App() {
       {!isAdminRoute && (
         <footer className="site-footer">
           <span>营业时间：周一至周日 08:00 - 22:00</span>
-          <span>地址：上海市浦东新区蓝湾路 88 号</span>
-          <span>客服微信：DaiaiSwim</span>
+          <span>地址：四川省成都市犀浦地铁站对面</span>
+          <span>客服微信：D1986144233</span>
         </footer>
       )}
     </div>

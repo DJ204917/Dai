@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
@@ -30,17 +29,15 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        working-directory: ./前端
         run: npm install
 
       - name: Build
-        working-directory: ./前端
         run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ./前端/dist
+          path: ./dist
 
   deploy:
     environment:

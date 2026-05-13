@@ -1,6 +1,7 @@
 {
   "name": "Daiai",
   "private": true,
+  "type": "module",
   "version": "0.1.0",
   "description": "迪爱泳馆 official website with booking, payment, rental, and admin framework.",
   "scripts": {

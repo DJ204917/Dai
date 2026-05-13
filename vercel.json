@@ -6,7 +6,7 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 10,
-      "includeFiles": "backend/**"
+      "includeFiles": "backend/dist/**"
     }
   },
   "rewrites": [

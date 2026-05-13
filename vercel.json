@@ -6,12 +6,7 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 10,
-      "includeFiles": [
-        "backend/dist/**",
-        "backend/node_modules/better-sqlite3/**",
-        "backend/node_modules/bindings/**",
-        "backend/node_modules/file-uri-to-path/**"
-      ]
+      "includeFiles": "backend/**"
     }
   },
   "rewrites": [

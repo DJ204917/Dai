@@ -13,7 +13,7 @@ const createBookingSchema = z.object({
   date: z.string().min(8),
   slot: z.string().min(5),
   people: z.number().int().positive(),
-  hours: z.number().int().positive().default(1),
+  hours: z.number().positive().default(1),
   rentalIds: z.array(z.string()).default([]),
   memberAccount: z.string().optional(),
   notes: z.string().optional()
@@ -23,13 +23,59 @@ const updateBookingSchema = z.object({
   date: z.string().min(8).optional(),
   slot: z.string().min(5).optional(),
   people: z.number().int().positive().optional(),
-  hours: z.number().int().positive().optional(),
+  hours: z.number().positive().optional(),
   notes: z.string().optional()
 });
 
 function calculateLaneAmount(hours: number, people: number) {
   const billableHours = Math.max(hours, 2);
   return (40 + Math.max(billableHours - 2, 0) * 10) * people;
+}
+
+function parseTimeRange(slot: string) {
+  const match = slot.match(/^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/);
+  if (!match) {
+    throw new AppError(400, "时间段格式应为 HH:mm-HH:mm");
+  }
+
+  const [, startHourValue, startMinuteValue, endHourValue, endMinuteValue] = match;
+  const start = Number(startHourValue) * 60 + Number(startMinuteValue);
+  const end = Number(endHourValue) * 60 + Number(endMinuteValue);
+  const opensAt = 8 * 60;
+  const closesAt = 22 * 60;
+  if (start < opensAt || end > closesAt) {
+    throw new AppError(400, "预约时间需在营业时间 08:00-22:00 内");
+  }
+  if (end <= start) {
+    throw new AppError(400, "结束时间需晚于开始时间");
+  }
+  if (start % 30 !== 0 || end % 30 !== 0) {
+    throw new AppError(400, "开始和结束时间只能选择整点或半点，请重新选择时间");
+  }
+
+  return { start, end, hours: Math.ceil((end - start) / 30) / 2 };
+}
+
+function timeRangesOverlap(left: { start: number; end: number }, right: { start: number; end: number }) {
+  return left.start < right.end && right.start < left.end;
+}
+
+function isActiveBooking(booking: { status: string }) {
+  return booking.status !== "cancelled";
+}
+
+function assertPrivateDayAvailable(date: string, serviceId: string) {
+  const bookings = getBookings();
+  const activeBookingsOnDate = bookings.filter((booking) => booking.date === date && isActiveBooking(booking));
+  const hasPrivateBooking = activeBookingsOnDate.some((booking) => booking.serviceId === "private");
+
+  if ((serviceId === "lane" || serviceId === "rental") && hasPrivateBooking) {
+    throw new AppError(409, "当天已被包场，泳道和装备余量不足，请选择其他日期");
+  }
+
+  if (serviceId === "private" && activeBookingsOnDate.length > 0) {
+    throw new AppError(409, "当天已有预约或包场订单，无法购买包场，请选择其他日期");
+  }
 }
 
 function calculateAvailability(date: string, serviceId = "lane") {
@@ -40,9 +86,25 @@ function calculateAvailability(date: string, serviceId = "lane") {
     throw new AppError(404, "服务不存在");
   }
 
+  if ((serviceId === "lane" || serviceId === "rental") && bookings.some((booking) => booking.date === date && booking.serviceId === "private" && isActiveBooking(booking))) {
+    return timeSlots.map((slot) => ({
+      slot,
+      capacity: service.capacityPerSlot,
+      used: service.capacityPerSlot,
+      available: 0,
+      disabled: true
+    }));
+  }
+
   return timeSlots.map((slot) => {
+    const targetRange = parseTimeRange(slot);
     const used = bookings
-      .filter((booking) => booking.date === date && booking.slot === slot && booking.serviceId === service.id && booking.status !== "cancelled")
+      .filter((booking) => {
+        if (booking.date !== date || booking.serviceId !== service.id || booking.status === "cancelled") {
+          return false;
+        }
+        return timeRangesOverlap(parseTimeRange(booking.slot), targetRange);
+      })
       .reduce((sum, booking) => sum + booking.people, 0);
 
     return {
@@ -133,13 +195,30 @@ function buildFeeItemsForBooking(booking: {
 }
 
 function assertSlotAvailable(date: string, slot: string, serviceId: string, people: number) {
-  const targetSlot = calculateAvailability(date, serviceId).find((item) => item.slot === slot);
-  if (!targetSlot) {
-    throw new AppError(400, "时间段不存在");
+  assertPrivateDayAvailable(date, serviceId);
+
+  const services = getServices();
+  const service = services.find((item) => item.id === serviceId);
+  if (!service) {
+    throw new AppError(404, "服务不存在");
   }
-  if (targetSlot.available < people) {
+
+  const targetRange = parseTimeRange(slot);
+  const bookings = getBookings();
+  const used = bookings
+    .filter((booking) => {
+      if (booking.date !== date || booking.serviceId !== service.id || booking.status === "cancelled") {
+        return false;
+      }
+      return timeRangesOverlap(parseTimeRange(booking.slot), targetRange);
+    })
+    .reduce((sum, booking) => sum + booking.people, 0);
+
+  if (service.capacityPerSlot - used < people) {
     throw new AppError(409, "该时间段剩余容量不足");
   }
+
+  return targetRange;
 }
 
 router.get("/", (req, res) => {
@@ -171,8 +250,11 @@ router.get("/:bookingId", (req, res) => {
 
 router.post("/", (req, res) => {
   const input = createBookingSchema.parse(req.body);
+  assertPrivateDayAvailable(input.date, input.serviceId);
+
   if (input.serviceId !== "rental") {
-    assertSlotAvailable(input.date, input.slot, input.serviceId, input.people);
+    const timeRange = assertSlotAvailable(input.date, input.slot, input.serviceId, input.people);
+    input.hours = timeRange.hours;
   }
 
   const feeItems = buildFeeItems(input);
@@ -207,9 +289,10 @@ router.patch("/:bookingId", (req, res) => {
   const nextDate = input.date ?? booking.date;
   const nextSlot = input.slot ?? booking.slot;
   const nextPeople = input.people ?? booking.people;
-  const nextHours = input.hours ?? booking.hours;
+  let nextHours = input.hours ?? booking.hours;
   if (booking.serviceId !== "rental" && (nextDate !== booking.date || nextSlot !== booking.slot || nextPeople !== booking.people)) {
-    assertSlotAvailable(nextDate, nextSlot, booking.serviceId, nextPeople);
+    const timeRange = assertSlotAvailable(nextDate, nextSlot, booking.serviceId, nextPeople);
+    nextHours = timeRange.hours;
   }
 
   const updatedBooking = updateBooking(req.params.bookingId, {

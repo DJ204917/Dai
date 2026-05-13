@@ -15,10 +15,33 @@ const invoiceSchema = z.object({
   email: z.string().email()
 });
 
+function assertMemberCanAccessOrder(order: { bookingId: string }, memberAccount?: string) {
+  if (!memberAccount) {
+    return;
+  }
+
+  const bookings = getBookings();
+  const booking = bookings.find((item) => item.id === order.bookingId);
+  if (!booking || booking.memberAccount !== memberAccount) {
+    throw new AppError(404, "订单不存在");
+  }
+}
+
 router.get("/", (req, res) => {
   const orders = getOrders();
   const status = req.query.status ? String(req.query.status) : undefined;
-  const data = orders.filter((order) => !status || order.status === status);
+  const memberAccount = req.query.memberAccount ? String(req.query.memberAccount) : undefined;
+  const bookings = getBookings();
+  const data = orders.filter((order) => {
+    if (status && order.status !== status) {
+      return false;
+    }
+    if (!memberAccount) {
+      return true;
+    }
+    const booking = bookings.find((item) => item.id === order.bookingId);
+    return booking?.memberAccount === memberAccount;
+  });
   res.json({ data });
 });
 
@@ -27,6 +50,7 @@ router.get("/:orderId", (req, res) => {
   if (!order) {
     throw new AppError(404, "订单不存在");
   }
+  assertMemberCanAccessOrder(order, req.query.memberAccount ? String(req.query.memberAccount) : undefined);
   const bookings = getBookings();
   const booking = bookings.find((item) => item.id === order.bookingId);
   res.json({ data: { order, booking } });
@@ -38,6 +62,7 @@ router.post("/:orderId/payments", (req, res) => {
   if (!order) {
     throw new AppError(404, "订单不存在");
   }
+  assertMemberCanAccessOrder(order, req.query.memberAccount ? String(req.query.memberAccount) : undefined);
   if (order.status !== "pending_payment") {
     throw new AppError(409, "订单当前状态不可支付");
   }
@@ -78,6 +103,7 @@ router.post("/:orderId/refund-requests", (req, res) => {
   if (!order) {
     throw new AppError(404, "订单不存在");
   }
+  assertMemberCanAccessOrder(order, req.query.memberAccount ? String(req.query.memberAccount) : undefined);
   if (order.status !== "paid") {
     throw new AppError(409, "只有已支付订单可以申请退款");
   }
@@ -101,6 +127,7 @@ router.post("/:orderId/cancel", (req, res) => {
   if (!order) {
     throw new AppError(404, "订单不存在");
   }
+  assertMemberCanAccessOrder(order, req.query.memberAccount ? String(req.query.memberAccount) : undefined);
   if (order.status !== "pending_payment") {
     throw new AppError(409, "只有待支付订单可以取消");
   }
@@ -147,6 +174,7 @@ router.post("/:orderId/invoice", (req, res) => {
   if (!order) {
     throw new AppError(404, "订单不存在");
   }
+  assertMemberCanAccessOrder(order, req.query.memberAccount ? String(req.query.memberAccount) : undefined);
   if (order.status !== "paid") {
     throw new AppError(409, "只有已支付订单可以申请发票");
   }

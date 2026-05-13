@@ -1,6 +1,6 @@
 import { LogIn, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 interface Member {
   id: string;
@@ -18,6 +18,8 @@ const passwordRegex = /^\d{6}$/;
 
 export default function Auth({ onLogin }: AuthProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get("next");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +57,7 @@ export default function Auth({ onLogin }: AuthProps) {
       onLogin(result.data);
       setStatus("success");
       setMessage(result.message ?? (mode === "login" ? "登录成功" : "注册成功"));
-      navigate("/");
+      navigate(nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "请求失败");

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 interface Summary {
   todayBookings: number;
   revenue: number;
+  revenueDate?: string;
   pendingRefunds: number;
   lowStockCount: number;
 }
@@ -116,7 +117,7 @@ function formatDateTime(value?: string) {
 }
 
 export default function Admin() {
-  const [summary, setSummary] = useState<Summary>({ todayBookings: 0, revenue: 0, pendingRefunds: 0, lowStockCount: 0 });
+  const [summary, setSummary] = useState<Summary>({ todayBookings: 0, revenue: 0, revenueDate: "", pendingRefunds: 0, lowStockCount: 0 });
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [refunds, setRefunds] = useState<RefundRow[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -188,7 +189,7 @@ export default function Admin() {
 
   const stats = [
     { label: "今日预约", value: summary.todayBookings, icon: CalendarClock, action: () => setView("todayBookings") },
-    { label: "今日营业额", value: `¥${summary.revenue}`, icon: ChartNoAxesCombined },
+    { label: summary.revenueDate ? `${summary.revenueDate} 营业额` : "最新订单日营业额", value: `¥${summary.revenue}`, icon: ChartNoAxesCombined },
     { label: "待退款", value: summary.pendingRefunds, icon: Receipt, action: () => setView("refunds") },
     { label: "装备库存预警", value: summary.lowStockCount, icon: Boxes, action: () => setView("equipment"), danger: summary.lowStockCount > 0 }
   ];

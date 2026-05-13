@@ -8,18 +8,36 @@ interface Order {
   amount: number;
   status: string;
   createdAt: string;
+  feeItems?: Array<{ label: string; amount: number }>;
 }
 
 interface Booking {
   id: string;
   serviceId: string;
+  courseId?: string;
   date: string;
   slot: string;
+  people: number;
+  hours: number;
+  rentalIds: string[];
 }
 
 interface OrderRow {
   order: Order;
   booking?: Booking;
+}
+
+interface Member {
+  id: string;
+  account: string;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+interface Equipment {
+  id: string;
+  name: string;
+  price: number;
 }
 
 const statusLabels: Record<string, string> = {
@@ -61,23 +79,50 @@ function formatBeijingDateTime(value?: string) {
   }).format(new Date(value));
 }
 
+function calculateLaneAmount(hours: number, people: number) {
+  const billableHours = Math.max(hours, 2);
+  return (40 + Math.max(billableHours - 2, 0) * 10) * people;
+}
+
+function formatCurrency(value: number) {
+  const normalized = Number.isInteger(value) ? value : Number(value.toFixed(2));
+  return `¥${normalized}`;
+}
+
 export default function Orders() {
+  const [member] = useState<Member | null>(() => JSON.parse(localStorage.getItem("member") || "null"));
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState("");
   const [actionStatus, setActionStatus] = useState<"success" | "error">("success");
 
   const loadOrders = async () => {
+    if (!member) {
+      setOrders([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     try {
-      const response = await fetch("/api/orders");
-      if (!response.ok) {
+      const accountQuery = `memberAccount=${encodeURIComponent(member.account)}`;
+      const [ordersResponse, equipmentResponse] = await Promise.all([
+        fetch(`/api/orders?${accountQuery}`),
+        fetch("/api/equipment")
+      ]);
+      if (!ordersResponse.ok) {
         throw new Error("订单接口请求失败");
       }
-      const result = await response.json();
+      const [result, equipmentResult] = await Promise.all([
+        ordersResponse.json(),
+        equipmentResponse.ok ? equipmentResponse.json() : Promise.resolve({ data: [] })
+      ]);
+      setEquipment(equipmentResult.data ?? []);
       const rows = await Promise.all(
         (result.data ?? []).map(async (order: Order) => {
-          const detailResponse = await fetch(`/api/orders/${order.id}`);
+          const detailResponse = await fetch(`/api/orders/${order.id}?${accountQuery}`);
           if (!detailResponse.ok) {
             return { order };
           }
@@ -106,13 +151,36 @@ export default function Orders() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [member]);
+
+  const getDisplayAmount = (order: Order, booking?: Booking) => {
+    if (!booking) {
+      return order.amount;
+    }
+
+    const rentalTotal = booking.rentalIds.reduce((sum, rentalId) => (
+      sum + (equipment.find((item) => item.id === rentalId)?.price ?? 0)
+    ), 0);
+
+    if (booking.serviceId === "lane") {
+      return calculateLaneAmount(booking.hours, booking.people) + rentalTotal;
+    }
+
+    if (booking.serviceId === "rental") {
+      return rentalTotal;
+    }
+
+    return order.amount;
+  };
 
   const updateOrder = async (orderId: string, action: "cancel" | "refund-requests") => {
     try {
       setActionMessage("");
       setActionStatus("success");
-      const response = await fetch(`/api/orders/${orderId}/${action}`, { method: "POST" });
+      if (!member) {
+        throw new Error("请先登录会员账号");
+      }
+      const response = await fetch(`/api/orders/${orderId}/${action}?memberAccount=${encodeURIComponent(member.account)}`, { method: "POST" });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message ?? "操作失败");
@@ -148,6 +216,13 @@ export default function Orders() {
           <p>订单加载中...</p>
         ) : error ? (
           <p className="error">加载失败: {error}</p>
+        ) : !member ? (
+          <div className="empty-state">
+            <p>请先登录会员账号查看自己的订单。</p>
+            <Link className="primary-button" to="/auth">会员登录</Link>
+          </div>
+        ) : orders.length === 0 ? (
+          <p>当前账号暂无订单。</p>
         ) : (
           <div className="table">
             <div className="table-head">
@@ -162,7 +237,7 @@ export default function Orders() {
                   <span>{order.id}</span>
                   <span>{typeLabel}</span>
                   <span>{formatBeijingDateTime(order.createdAt)}</span>
-                  <span>¥{order.amount}</span>
+                  <span>{formatCurrency(getDisplayAmount(order, booking))}</span>
                   <span className="status">{statusLabel}</span>
                   {isPending ? (
                     <div className="table-actions">

@@ -545,6 +545,33 @@ select {
   border-radius: 8px;
 }
 
+.time-duration-note {
+  display: grid;
+  gap: 6px;
+  min-height: 42px;
+  padding: 9px 10px;
+  color: #435154;
+  font-weight: 700;
+  background: #eef7f5;
+  border: 1px solid #c7ded8;
+  border-radius: 8px;
+}
+
+.time-duration-note.invalid {
+  color: #8a3f24;
+  background: #fff3ed;
+  border-color: #efc6b3;
+}
+
+.time-duration-note span {
+  font-size: 14px;
+}
+
+.time-duration-note strong {
+  color: #052a3c;
+  line-height: 1.5;
+}
+
 .course-plan-note span {
   font-size: 14px;
 }

@@ -14,6 +14,10 @@ function getBeijingDateKey(value: Date | string = new Date()) {
   }).format(new Date(value));
 }
 
+function getOrderEventTime(order: ReturnType<typeof getOrders>[number]) {
+  return order.paidAt ?? order.refundedAt ?? order.createdAt;
+}
+
 const equipmentSchema = z.object({
   name: z.string().min(1),
   price: z.number().nonnegative(),
@@ -46,17 +50,21 @@ const contentSchema = z.object({
 router.get("/summary", (_req, res) => {
   const orders = getOrders();
   const bookings = getBookings();
-  const today = getBeijingDateKey();
+  const latestOrderTime = orders
+    .map((order) => getOrderEventTime(order))
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0];
+  const targetDate = latestOrderTime ? getBeijingDateKey(latestOrderTime) : getBeijingDateKey();
   const slotCounts = bookings.reduce<Record<string, number>>((acc, booking) => {
     acc[booking.slot] = (acc[booking.slot] ?? 0) + 1;
     return acc;
   }, {});
   const hotSlot = Object.entries(slotCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "暂无";
   const netRevenue = orders.reduce((sum, order) => {
-    if (order.status === "paid" && order.paidAt && getBeijingDateKey(order.paidAt) === today) {
+    if (order.status === "paid" && order.paidAt && getBeijingDateKey(order.paidAt) === targetDate) {
       return sum + order.amount;
     }
-    if (order.status === "refunded" && order.refundedAt && getBeijingDateKey(order.refundedAt) === today) {
+    if (order.status === "refunded" && order.refundedAt && getBeijingDateKey(order.refundedAt) === targetDate) {
       return sum - order.amount;
     }
     return sum;
@@ -64,8 +72,9 @@ router.get("/summary", (_req, res) => {
 
   res.json({
     data: {
-      todayBookings: bookings.filter((booking) => getBeijingDateKey(booking.createdAt) === today).length,
+      todayBookings: bookings.filter((booking) => getBeijingDateKey(booking.createdAt) === targetDate).length,
       revenue: Math.max(0, netRevenue),
+      revenueDate: targetDate,
       hotSlot,
       pendingRefunds: orders.filter((order) => order.status === "refund_reviewing").length,
       lowStockCount: getEquipment().filter((item) => item.stock <= Math.max(3, Math.ceil(item.totalStock * 0.2))).length,

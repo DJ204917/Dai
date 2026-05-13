@@ -83,7 +83,7 @@ export default function App() {
           </nav>
           <a className="hotline" href="tel:18224358955">
             <Phone size={18} />
-            <span>18224358955</span>
+            <span>客服电话：18224358955</span>
           </a>
           {member ? (
             <button className="member-chip" onClick={handleLogout} type="button" title="点击退出登录">

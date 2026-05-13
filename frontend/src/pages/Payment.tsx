@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, QrCode, Smartphone, WalletCards } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
-import { timeSlots } from "../data/mock";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 type PaymentMethod = "wechat" | "alipay";
 
@@ -43,6 +42,7 @@ interface ExistingOrder {
   id: string;
   amount: number;
   status: string;
+  createdAt?: string;
 }
 
 interface ExistingBooking {
@@ -85,15 +85,31 @@ const coursePlanLabels: Record<string, string> = {
 };
 
 const EQUIPMENT_DEPOSIT = 20;
+const halfHourTimeOptions = Array.from({ length: 29 }, (_, index) => {
+  const minutes = 8 * 60 + index * 30;
+  const hour = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const minute = String(minutes % 60).padStart(2, "0");
+  return `${hour}:${minute}`;
+});
 
 function buildDateOptions(selectedDate: string) {
-  const start = new Date("2026-05-09T00:00:00");
+  const start = new Date(`${getLocalDateValue()}T00:00:00`);
   const dates = Array.from({ length: 30 }, (_, index) => {
     const next = new Date(start);
     next.setDate(start.getDate() + index);
     return next.toISOString().slice(0, 10);
   });
-  return dates.includes(selectedDate) ? dates : [selectedDate, ...dates];
+  return dates.includes(selectedDate) ? dates : dates;
+}
+
+function getLocalDateValue(date = new Date()) {
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+function normalizeBookableDate(value: string | null) {
+  const today = getLocalDateValue();
+  return value && value >= today ? value : today;
 }
 
 function calculateLaneAmount(hours: number, people: number) {
@@ -101,12 +117,63 @@ function calculateLaneAmount(hours: number, people: number) {
   return (40 + Math.max(billableHours - 2, 0) * 10) * people;
 }
 
+function calculateLaneAmountPerPerson(hours: number) {
+  const billableHours = Math.max(hours, 2);
+  return 40 + Math.max(billableHours - 2, 0) * 10;
+}
+
+function parseSlot(value: string) {
+  const match = value.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+  return {
+    startTime: normalizeHalfHourTime(match?.[1], "09:00"),
+    endTime: normalizeHalfHourTime(match?.[2], "10:00")
+  };
+}
+
+function normalizeHalfHourTime(value: string | undefined, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+
+  const [hour, minute] = value.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return fallback;
+  }
+
+  const minMinutes = 8 * 60;
+  const maxMinutes = 22 * 60;
+  const roundedMinutes = Math.ceil((hour * 60 + minute) / 30) * 30;
+  const boundedMinutes = Math.min(Math.max(roundedMinutes, minMinutes), maxMinutes);
+  const normalizedHour = String(Math.floor(boundedMinutes / 60)).padStart(2, "0");
+  const normalizedMinute = String(boundedMinutes % 60).padStart(2, "0");
+  return `${normalizedHour}:${normalizedMinute}`;
+}
+
+function getTimeHours(startTime: string, endTime: string) {
+  const [startHour, startMinute] = startTime.split(":").map(Number);
+  const [endHour, endMinute] = endTime.split(":").map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  const minutes = end - start;
+  return minutes > 0 ? Math.ceil(minutes / 30) / 2 : 0;
+}
+
+function formatHours(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+const timeValidationPattern = /时间|整点|半点|30 分钟|结束时间/;
+
 export default function Payment() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const initialServiceId = searchParams.get("service") ?? searchParams.get("serviceId") ?? "lane";
   const itemType = searchParams.get("type");
   const itemId = searchParams.get("item");
   const existingOrderId = searchParams.get("orderId");
+  const initialSlot = searchParams.get("slot") ?? "09:00-10:00";
+  const parsedInitialSlot = parseSlot(initialSlot);
   const rentalIdsParam = searchParams.get("rentalIds") ?? searchParams.get("rentals");
   const rentalQuantities: Record<string, number> = {};
   const rentalIds: string[] = [];
@@ -140,10 +207,10 @@ export default function Payment() {
 
   const [contactName, setContactName] = useState("张三");
   const [phone, setPhone] = useState("13800138000");
-  const [date, setDate] = useState(searchParams.get("date") ?? "2026-05-12");
-  const [slot, setSlot] = useState(searchParams.get("slot") ?? timeSlots[0]);
+  const [date, setDate] = useState(normalizeBookableDate(searchParams.get("date")));
+  const [startTime, setStartTime] = useState(parsedInitialSlot.startTime);
+  const [endTime, setEndTime] = useState(parsedInitialSlot.endTime);
   const [people, setPeople] = useState(Number(searchParams.get("people") ?? 1));
-  const [hours, setHours] = useState(Math.max(Number(searchParams.get("hours") ?? 2), 2));
   const [quantity, setQuantity] = useState(Number(searchParams.get("quantity") ?? 1));
   const [method, setMethod] = useState<PaymentMethod>("wechat");
   const [status, setStatus] = useState<"idle" | "paying" | "success" | "error" | "info">("idle");
@@ -154,6 +221,17 @@ export default function Payment() {
   const [receiptCodeVersion, setReceiptCodeVersion] = useState(Date.now());
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const isExistingOrderPayable = !existingOrder || existingOrder.status === "pending_payment";
+  const memberAccount = JSON.parse(localStorage.getItem("member") || "null")?.account as string | undefined;
+  const memberAccountQuery = memberAccount ? `?memberAccount=${encodeURIComponent(memberAccount)}` : "";
+  const slot = `${startTime}-${endTime}`;
+  const hours = useMemo(() => getTimeHours(startTime, endTime), [startTime, endTime]);
+  const hasValidTimeRange = service.id === "rental" || hours > 0;
+  const displayOrderId = existingOrderId ?? createdOrderId;
+  const laneAmountPerPerson = calculateLaneAmountPerPerson(hours);
+  const laneServiceAmount = calculateLaneAmount(hours, people);
+  const redirectToAuth = () => {
+    navigate(`/auth?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -186,7 +264,7 @@ export default function Payment() {
       return;
     }
 
-    fetch(`/api/orders/${existingOrderId}`)
+    fetch(`/api/orders/${existingOrderId}${memberAccountQuery}`)
       .then((response) => {
         if (!response.ok) {
           throw new Error("订单不存在");
@@ -205,9 +283,10 @@ export default function Payment() {
           setContactName(booking.contactName);
           setPhone(booking.phone);
           setDate(booking.date);
-          setSlot(booking.slot);
+          const parsedSlot = parseSlot(booking.slot);
+          setStartTime(parsedSlot.startTime);
+          setEndTime(parsedSlot.endTime);
           setPeople(booking.people);
-          setHours(booking.hours);
         }
       })
       .catch((error) => {
@@ -215,6 +294,24 @@ export default function Payment() {
         setMessage(error instanceof Error ? error.message : "订单加载失败");
       });
   }, [existingOrderId, loading]);
+
+  useEffect(() => {
+    const normalizedStart = normalizeHalfHourTime(startTime, "09:00");
+    const normalizedEnd = normalizeHalfHourTime(endTime, "10:00");
+    if (normalizedStart !== startTime) {
+      setStartTime(normalizedStart);
+    }
+    if (normalizedEnd !== endTime) {
+      setEndTime(normalizedEnd);
+    }
+  }, [startTime, endTime]);
+
+  useEffect(() => {
+    if (hasValidTimeRange && status === "error" && timeValidationPattern.test(message)) {
+      setStatus("idle");
+      setMessage("");
+    }
+  }, [date, startTime, endTime, hasValidTimeRange, status, message]);
 
   const dateOptions = useMemo(() => buildDateOptions(date), [date]);
 
@@ -295,16 +392,25 @@ export default function Payment() {
       courseId: service.id === "course" ? selectedCourse?.id ?? "adult-basic" : undefined,
       contactName,
       phone,
-      date: service.id === "rental" ? new Date().toISOString().slice(0, 10) : date,
+      date: service.id === "rental" ? getLocalDateValue() : date,
       slot: service.id === "rental" ? "09:00-10:00" : slot,
       people: service.id === "rental" ? 1 : people,
-      hours: service.id === "rental" ? 1 : Math.max(hours, service.id === "lane" ? 2 : 1),
+      hours: service.id === "rental" ? 1 : hours,
       rentalIds,
-      memberAccount: JSON.parse(localStorage.getItem("member") || "null")?.account
+      memberAccount
     };
   };
 
   const createPendingOrder = async () => {
+    if (!memberAccount) {
+      redirectToAuth();
+      throw new Error("请先登录会员账号");
+    }
+
+    if (!hasValidTimeRange) {
+      throw new Error("结束时间需晚于开始时间");
+    }
+
     const response = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -314,8 +420,12 @@ export default function Payment() {
     if (!response.ok) {
       throw new Error(result.message ?? "创建订单失败");
     }
-    const orderId = result.data.order.id as string;
+    const order = result.data.order as ExistingOrder;
+    const booking = result.data.booking as ExistingBooking;
+    const orderId = order.id;
     setCreatedOrderId(orderId);
+    setExistingOrder(order);
+    setExistingBooking(booking);
     return orderId;
   };
 
@@ -339,13 +449,23 @@ export default function Payment() {
 
   const showInsufficientInventoryMessage = (error: unknown) => {
     const rawMessage = error instanceof Error ? error.message : "";
+    if (rawMessage.includes("包场")) {
+      setStatus("error");
+      setMessage(rawMessage);
+      return;
+    }
     const isInventoryError = /不足|库存|余量|名额|容量/.test(rawMessage);
     setStatus("error");
     setMessage(isInventoryError ? "订单中有余量不足商品请重新选择商品" : rawMessage || "创建订单失败，请重新选择商品");
   };
 
   const payOrder = async (orderId: string) => {
-    const response = await fetch(`/api/orders/${orderId}/payments`, {
+    if (!memberAccount) {
+      redirectToAuth();
+      throw new Error("请先登录会员账号");
+    }
+
+    const response = await fetch(`/api/orders/${orderId}/payments${memberAccountQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ method })
@@ -358,6 +478,11 @@ export default function Payment() {
   };
 
   const handlePay = async () => {
+    if (!memberAccount) {
+      redirectToAuth();
+      return;
+    }
+
     if (existingOrder && existingOrder.status !== "pending_payment") {
       setStatus("error");
       setMessage(`订单当前为${orderStatusLabels[existingOrder.status] ?? existingOrder.status}，不可重复支付。`);
@@ -398,6 +523,11 @@ export default function Payment() {
   };
 
   const handleWechatPaymentComplete = async () => {
+    if (!memberAccount) {
+      redirectToAuth();
+      return;
+    }
+
     setStatus("paying");
     setMessage("正在确认支付结果...");
 
@@ -417,13 +547,23 @@ export default function Payment() {
   };
 
   const handlePayLater = async () => {
+    if (!memberAccount) {
+      redirectToAuth();
+      return;
+    }
+
+    if (existingOrderId || createdOrderId) {
+      navigate("/orders");
+      return;
+    }
+
     setStatus("paying");
     setMessage("");
 
     try {
       const orderId = await createPendingOrder();
       setStatus("success");
-      setMessage(`已生成待支付订单：${orderId}`);
+      setMessage(`已生成待支付订单：${orderId}，可在订单页继续支付。`);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "创建待支付订单失败");
@@ -464,26 +604,31 @@ export default function Payment() {
                   </select>
                 </label>
                 <label>
-                  时间段
-                  <select value={slot} onChange={(event) => setSlot(event.target.value)}>
-                    {timeSlots.map((item) => <option key={item}>{item}</option>)}
+                  开始时间
+                  <select value={startTime} onChange={(event) => setStartTime(event.target.value)}>
+                    {halfHourTimeOptions.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </label>
+                <label>
+                  结束时间
+                  <select value={endTime} onChange={(event) => setEndTime(event.target.value)}>
+                    {halfHourTimeOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>
                   人数
                   <input min={1} type="number" value={people} onChange={(event) => setPeople(Number(event.target.value))} />
                 </label>
+                <div className={hasValidTimeRange ? "time-duration-note" : "time-duration-note invalid"}>
+                  <span>预约时长</span>
+                  <strong>{hasValidTimeRange ? `共 ${formatHours(hours)} 小时` : "结束时间需晚于开始时间"}</strong>
+                </div>
                 {service.id === "course" && selectedCourse ? (
                   <div className="course-plan-note">
                     <span>课程安排</span>
                     <strong>{coursePlanLabel}</strong>
                   </div>
-                ) : (
-                  <label>
-                    时长
-                    <input min={service.id === "lane" ? 2 : 1} type="number" value={hours} onChange={(event) => setHours(Math.max(Number(event.target.value), service.id === "lane" ? 2 : 1))} />
-                  </label>
-                )}
+                ) : null}
               </>
             )}
           </div>
@@ -492,10 +637,19 @@ export default function Payment() {
         <aside className="summary-panel">
           <h2>支付确认</h2>
           <div className="price-line"><span>业务类型</span><strong>{existingBooking ? serviceLabels[existingBooking.serviceId] ?? existingBooking.serviceId : businessLabel}</strong></div>
-          {existingOrderId && <div className="price-line"><span>订单号</span><strong>{existingOrderId}</strong></div>}
+          {displayOrderId && <div className="price-line"><span>订单号</span><strong>{displayOrderId}</strong></div>}
           {existingOrder && <div className="price-line"><span>订单状态</span><strong>{orderStatusLabels[existingOrder.status] ?? existingOrder.status}</strong></div>}
           {!existingOrderId && (selectedCourse || selectedEquipment) && <div className="price-line"><span>项目名称</span><strong>{displayTitle}</strong></div>}
-          {!existingOrderId && <div className="price-line"><span>单价</span><strong>¥{unitPrice}</strong></div>}
+          {!existingOrderId && service.id !== "lane" && <div className="price-line"><span>单价</span><strong>¥{unitPrice}</strong></div>}
+          {(existingBooking?.serviceId === "lane" || (!existingBooking && service.id === "lane")) && (
+            <div className="deposit-info">
+              <div className="price-line"><span>计费规则</span><strong>前2小时¥40/人，之后每小时+¥10/人</strong></div>
+              <div className="price-line"><span>预约时长</span><strong>{formatHours(hours)}小时</strong></div>
+              <div className="price-line"><span>预约人数</span><strong>{people}人</strong></div>
+              <div className="price-line"><span>泳道费用</span><strong>¥{laneServiceAmount}</strong></div>
+              <p className="deposit-note">每人本次泳道费用 ¥{laneAmountPerPerson}，未满 2 小时按前 2 小时计费。</p>
+            </div>
+          )}
           {selectedEquipment && (
             <>
               <div className="price-line"><span>数量</span><strong>{quantity}</strong></div>
@@ -577,7 +731,7 @@ export default function Payment() {
               我已完成支付
             </button>
           )}
-          {!existingOrderId && (
+          {isExistingOrderPayable && (
             <button className="secondary-pay-button" disabled={status === "paying"} onClick={handlePayLater}>
               稍后支付
             </button>

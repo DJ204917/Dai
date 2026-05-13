@@ -68,7 +68,7 @@ export default function App() {
         <header className="site-header">
           <NavLink to="/" className="brand" aria-label="返回首页">
             <span className="brand-mark"><Waves size={22} /></span>
-            <span>澄蓝泳馆</span>
+            <span>迪爱泳馆</span>
           </NavLink>
           <nav className="main-nav">
             {navItems.map((item) => {
@@ -117,7 +117,7 @@ export default function App() {
         <footer className="site-footer">
           <span>营业时间：周一至周日 08:00 - 22:00</span>
           <span>地址：上海市浦东新区蓝湾路 88 号</span>
-          <span>客服微信：ChenglanSwim</span>
+          <span>客服微信：DaiaiSwim</span>
         </footer>
       )}
     </div>

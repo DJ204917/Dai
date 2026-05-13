@@ -1,6 +1,6 @@
 import { Mail, MapPinned, Navigation, Phone } from "lucide-react";
 
-const xipuNavigationUrl = "https://uri.amap.com/navigation?to=103.976356,30.753039,%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99&mode=walk&policy=1&src=chenglan-swim";
+const xipuNavigationUrl = "https://uri.amap.com/navigation?to=103.976356,30.753039,%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99&mode=walk&policy=1&src=daiai-swim";
 const xipuMobileNavigationUrl = "geo:30.753039,103.976356?q=%E5%9B%9B%E5%B7%9D%E7%9C%81%E6%88%90%E9%83%BD%E5%B8%82%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99";
 
 function openXipuNavigation() {
@@ -18,7 +18,7 @@ export default function Contact() {
       <div className="two-column">
         <section className="panel contact-list">
           <p><Phone size={20} /> 400-800-6688</p>
-          <p><Mail size={20} /> service@chenglan-swim.example</p>
+          <p><Mail size={20} /> service@daiai-swim.example</p>
           <p><MapPinned size={20} /> 四川省成都市犀浦地铁站</p>
           <p><Navigation size={20} /> 点击右侧导航到犀浦地铁站</p>
         </section>

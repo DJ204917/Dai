@@ -188,11 +188,11 @@ insertBooking.run('B20260509001', 'lane', null, '示例会员', '13800000000', '
 insertOrder.run('O20260509001', 'B20260509001', 98, 'paid', 'wechat', '[{"label":"泳道预约 1小时","amount":80},{"label":"防雾泳镜租赁","amount":12},{"label":"硅胶泳帽租赁","amount":6}]', '2026-05-09T08:05:00.000Z', '2026-05-09T08:00:00.000Z');
 
 // Site content
-insertSiteContent.run('shopName', '澄蓝泳馆');
+insertSiteContent.run('shopName', '迪爱泳馆');
 insertSiteContent.run('phone', '400-800-6688');
 insertSiteContent.run('workTime', '周一至周日 08:00 - 22:00');
 insertSiteContent.run('address', '北京市朝阳区建国路88号现代城A座1层');
-insertSiteContent.run('email', 'service@chenglan.com');
+insertSiteContent.run('email', 'service@daiai.com');
 
 console.log('Database initialized successfully');
 

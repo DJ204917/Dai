@@ -21,7 +21,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "swim-shop-backend" });
+  res.json({ status: "ok", service: "Daiai-backend" });
 });
 
 const apiModules = {
@@ -83,7 +83,7 @@ app.get("/api", (req, res) => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>游泳店后端接口</title>
+    <title>迪爱泳馆后端接口</title>
     <style>
       body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; color: #172326; background: #f5f7f4; }
       main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
@@ -99,7 +99,7 @@ app.get("/api", (req, res) => {
   </head>
   <body>
     <main>
-      <h1>游泳店后端接口</h1>
+      <h1>迪爱泳馆后端接口</h1>
       <p>这是后端 API 文档页。前端页面请打开 <a href="http://localhost:5173">http://localhost:5173</a>。</p>
       ${sections}
     </main>
@@ -109,7 +109,7 @@ app.get("/api", (req, res) => {
   }
 
   res.json({
-    service: "swim-shop-backend",
+    service: "Daiai-backend",
     modules: apiModules
   });
 });
@@ -125,5 +125,5 @@ app.use("/api", (_req, res) => {
 app.use(errorHandler);
 
 app.listen(port, () => {
-  console.log(`Swim shop API is running at http://localhost:${port}`);
+  console.log(`Daiai API is running at http://localhost:${port}`);
 });

@@ -1,8 +1,8 @@
 {
-  "name": "swim-shop-platform",
+  "name": "Daiai",
   "private": true,
   "version": "0.1.0",
-  "description": "Swimming shop official website with booking, payment, rental, and admin framework.",
+  "description": "迪爱泳馆 official website with booking, payment, rental, and admin framework.",
   "scripts": {
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "npm --prefix frontend run dev",

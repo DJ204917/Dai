@@ -100,7 +100,7 @@ export default function Home() {
         </div>
         <div className="hero-content">
           <p className="eyebrow">官方预约平台</p>
-          <h1>澄蓝泳馆</h1>
+          <h1>迪爱泳馆</h1>
           <p>泳道预约、课程报名、装备租赁和在线支付集中处理，让用户少排队，让门店少对账。</p>
           <div className="hero-actions">
             <Link className="primary-button" to="/booking">立即预约 <ArrowRight size={18} /></Link>

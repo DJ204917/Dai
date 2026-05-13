@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ban, CreditCard, FileText, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 interface Order {
   id: string;
@@ -109,8 +110,8 @@ export default function Orders() {
     try {
       const accountQuery = `memberAccount=${encodeURIComponent(member.account)}`;
       const [ordersResponse, equipmentResponse] = await Promise.all([
-        fetch(`/api/orders?${accountQuery}`),
-        fetch("/api/equipment")
+        apiFetch(`/api/orders?${accountQuery}`),
+        apiFetch("/api/equipment")
       ]);
       if (!ordersResponse.ok) {
         throw new Error("订单接口请求失败");
@@ -122,7 +123,7 @@ export default function Orders() {
       setEquipment(equipmentResult.data ?? []);
       const rows = await Promise.all(
         (result.data ?? []).map(async (order: Order) => {
-          const detailResponse = await fetch(`/api/orders/${order.id}?${accountQuery}`);
+          const detailResponse = await apiFetch(`/api/orders/${order.id}?${accountQuery}`);
           if (!detailResponse.ok) {
             return { order };
           }
@@ -180,7 +181,7 @@ export default function Orders() {
       if (!member) {
         throw new Error("请先登录会员账号");
       }
-      const response = await fetch(`/api/orders/${orderId}/${action}?memberAccount=${encodeURIComponent(member.account)}`, { method: "POST" });
+      const response = await apiFetch(`/api/orders/${orderId}/${action}?memberAccount=${encodeURIComponent(member.account)}`, { method: "POST" });
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.message ?? "操作失败");

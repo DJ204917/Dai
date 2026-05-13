@@ -79,3 +79,29 @@ PATCH /api/admin/content/contact
 - 支付：微信支付、支付宝，订单支付回调需要验签和幂等处理
 - 通知：短信服务商 + 站内信，预约前 24 小时和 2 小时定时提醒
 - 安全：HTTPS、密码哈希、JWT/Session、接口限流、支付 webhook 白名单
+
+## 部署
+
+### Vercel
+
+Vercel 使用根目录的 `vercel.json`。前端会构建到 `frontend/dist`，后端 API 通过根目录 `api` 下的 Serverless Function 暴露 `/api/*`。
+
+建议在 Vercel 项目里设置：
+
+```bash
+VITE_BASE_PATH=/
+```
+
+当前 SQLite 数据库在 Vercel 上会写到 `/tmp/database.db`，适合演示和测试；正式上线建议换成 PostgreSQL、MySQL 或其他托管数据库。
+
+### GitHub Pages
+
+GitHub Pages 只托管静态前端，不能运行 Express API。仓库已添加 `.github/workflows/github-pages.yml`，推送到 `main` 后会自动构建并发布 `frontend/dist`。
+
+需要在 GitHub 仓库的 `Settings -> Secrets and variables -> Actions` 添加：
+
+```bash
+VITE_API_BASE_URL=https://你的-vercel-域名.vercel.app
+```
+
+工作流会自动把 `VITE_BASE_PATH` 设置为仓库名路径，例如 `/Dai/`。

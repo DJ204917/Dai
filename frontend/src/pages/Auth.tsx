@@ -1,6 +1,7 @@
 import { LogIn, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 interface Member {
   id: string;
@@ -44,7 +45,7 @@ export default function Auth({ onLogin }: AuthProps) {
 
     setStatus("loading");
     try {
-      const response = await fetch(`/api/auth/${mode === "login" ? "login" : "register"}`, {
+      const response = await apiFetch(`/api/auth/${mode === "login" ? "login" : "register"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ account, password })

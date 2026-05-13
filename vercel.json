@@ -1,8 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm run install:all",
-  "buildCommand": "npm --prefix frontend run build",
+  "buildCommand": "npm --prefix frontend run build && npm --prefix backend run build",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/).*)",

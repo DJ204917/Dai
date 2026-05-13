@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, QrCode, Smartphone, WalletCards } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 type PaymentMethod = "wechat" | "alipay";
 
@@ -237,9 +238,9 @@ export default function Payment() {
     const fetchData = async () => {
       try {
         const [servicesResponse, coursesResponse, equipmentResponse] = await Promise.all([
-          fetch("/api/services"),
-          fetch("/api/courses"),
-          fetch("/api/equipment")
+          apiFetch("/api/services"),
+          apiFetch("/api/courses"),
+          apiFetch("/api/equipment")
         ]);
         const [servicesResult, coursesResult, equipmentResult] = await Promise.all([
           servicesResponse.json(),
@@ -264,7 +265,7 @@ export default function Payment() {
       return;
     }
 
-    fetch(`/api/orders/${existingOrderId}${memberAccountQuery}`)
+    apiFetch(`/api/orders/${existingOrderId}${memberAccountQuery}`)
       .then((response) => {
         if (!response.ok) {
           throw new Error("订单不存在");
@@ -411,7 +412,7 @@ export default function Payment() {
       throw new Error("结束时间需晚于开始时间");
     }
 
-    const response = await fetch("/api/bookings", {
+    const response = await apiFetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildBookingPayload())
@@ -465,7 +466,7 @@ export default function Payment() {
       throw new Error("请先登录会员账号");
     }
 
-    const response = await fetch(`/api/orders/${orderId}/payments${memberAccountQuery}`, {
+    const response = await apiFetch(`/api/orders/${orderId}/payments${memberAccountQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ method })

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 interface Service {
   id: string;
@@ -83,8 +84,8 @@ export default function Booking() {
   useEffect(() => {
     const loadCatalog = async () => {
       const [servicesResponse, equipmentResponse] = await Promise.all([
-        fetch("/api/services"),
-        fetch("/api/equipment")
+        apiFetch("/api/services"),
+        apiFetch("/api/equipment")
       ]);
       const [servicesResult, equipmentResult] = await Promise.all([
         servicesResponse.json(),

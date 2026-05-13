@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarCheck, Clock, CreditCard, ShieldCheck, Store } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "../lib/api";
 
 interface Service {
   id: string;
@@ -44,9 +45,9 @@ export default function Home() {
   useEffect(() => {
     const loadCatalog = async () => {
       const [servicesResponse, coursesResponse, equipmentResponse] = await Promise.all([
-        fetch("/api/services"),
-        fetch("/api/courses"),
-        fetch("/api/equipment")
+        apiFetch("/api/services"),
+        apiFetch("/api/courses"),
+        apiFetch("/api/equipment")
       ]);
       const [servicesResult, coursesResult, equipmentResult] = await Promise.all([
         servicesResponse.json(),

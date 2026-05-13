@@ -1,6 +1,7 @@
 import { Boxes, CalendarClock, ChartNoAxesCombined, Eye, Plus, Receipt, XCircle, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { apiFetch } from "../lib/api";
 
 interface Summary {
   todayBookings: number;
@@ -127,10 +128,10 @@ export default function Admin() {
 
   const loadAdminData = async () => {
     const [summaryResponse, bookingsResponse, refundsResponse, equipmentResponse] = await Promise.all([
-      fetch("/api/admin/summary"),
-      fetch("/api/admin/bookings"),
-      fetch("/api/admin/refunds"),
-      fetch("/api/equipment")
+      apiFetch("/api/admin/summary"),
+      apiFetch("/api/admin/bookings"),
+      apiFetch("/api/admin/refunds"),
+      apiFetch("/api/equipment")
     ]);
     const [summaryResult, bookingsResult, refundsResult, equipmentResult] = await Promise.all([
       summaryResponse.json(),
@@ -149,7 +150,7 @@ export default function Admin() {
   }, []);
 
   const approveRefund = async (orderId: string) => {
-    const response = await fetch(`/api/orders/${orderId}/refund-approve`, { method: "POST" });
+    const response = await apiFetch(`/api/orders/${orderId}/refund-approve`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) {
       setMessage(result.message ?? "退款处理失败");
@@ -160,7 +161,7 @@ export default function Admin() {
   };
 
   const cancelBooking = async (bookingId: string) => {
-    const response = await fetch(`/api/admin/bookings/${bookingId}/cancel`, { method: "POST" });
+    const response = await apiFetch(`/api/admin/bookings/${bookingId}/cancel`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) {
       setMessage(result.message ?? "取消预约失败");
@@ -172,7 +173,7 @@ export default function Admin() {
 
   const createEquipment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const response = await fetch("/api/admin/equipment", {
+    const response = await apiFetch("/api/admin/equipment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(equipmentForm)

@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, '../../data/database.db');
+const dbPath = process.env.DATABASE_PATH
+  ?? (process.env.VERCEL ? path.join('/tmp', 'database.db') : path.join(__dirname, '../../data/database.db'));
 const db: any = new Database(dbPath);
 
 // Enable foreign keys

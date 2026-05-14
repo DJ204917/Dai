@@ -1,7 +1,7 @@
 import { Boxes, CalendarClock, ChartNoAxesCombined, Eye, Plus, Receipt, XCircle, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiJson } from "../lib/api";
 
 interface Summary {
   todayBookings: number;
@@ -127,22 +127,31 @@ export default function Admin() {
   const [message, setMessage] = useState("");
 
   const loadAdminData = async () => {
-    const [summaryResponse, bookingsResponse, refundsResponse, equipmentResponse] = await Promise.all([
-      apiFetch("/api/admin/summary"),
-      apiFetch("/api/admin/bookings"),
-      apiFetch("/api/admin/refunds"),
-      apiFetch("/api/equipment")
+    const loadJson = async <T,>(path: string, fallback: T) => {
+      try {
+        const response = await apiFetch(path);
+        const result = await apiJson<{ data?: T; message?: string }>(response);
+        if (!response.ok) {
+          throw new Error(result.message ?? `接口请求失败（${response.status}）`);
+        }
+        return result.data ?? fallback;
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "后台数据加载失败");
+        return fallback;
+      }
+    };
+
+    const [nextSummary, nextBookings, nextRefunds, nextEquipment] = await Promise.all([
+      loadJson<Summary>("/api/admin/summary", { todayBookings: 0, revenue: 0, revenueDate: "", pendingRefunds: 0, lowStockCount: 0 }),
+      loadJson<AdminBooking[]>("/api/admin/bookings", []),
+      loadJson<RefundRow[]>("/api/admin/refunds", []),
+      loadJson<Equipment[]>("/api/equipment", [])
     ]);
-    const [summaryResult, bookingsResult, refundsResult, equipmentResult] = await Promise.all([
-      summaryResponse.json(),
-      bookingsResponse.json(),
-      refundsResponse.json(),
-      equipmentResponse.json()
-    ]);
-    setSummary(summaryResult.data);
-    setBookings(bookingsResult.data ?? []);
-    setRefunds(refundsResult.data ?? []);
-    setEquipment(equipmentResult.data ?? []);
+
+    setSummary(nextSummary);
+    setBookings(nextBookings);
+    setRefunds(nextRefunds);
+    setEquipment(nextEquipment);
   };
 
   useEffect(() => {

@@ -33,7 +33,9 @@ const apiModules = {
   ],
   auth: [
     "POST /api/auth/register",
-    "POST /api/auth/login"
+    "POST /api/auth/login",
+    "POST /api/register",
+    "POST /api/login"
   ],
   bookings: [
     "GET /api/bookings",
@@ -114,6 +116,12 @@ app.get("/api", (req, res) => {
 });
 
 app.use("/api", catalogRouter);
+app.get(["/api/register", "/api/login"], (_req, res) => {
+  res.status(405).json({
+    message: "请在会员登录页提交表单，或使用 POST /api/auth/register、POST /api/auth/login"
+  });
+});
+app.use("/api", authRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/orders", ordersRouter);

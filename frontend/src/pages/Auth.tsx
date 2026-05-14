@@ -1,7 +1,7 @@
 import { LogIn, UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiJson } from "../lib/api";
 
 interface Member {
   id: string;
@@ -51,9 +51,12 @@ export default function Auth({ onLogin }: AuthProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ account, password })
       });
-      const result = await response.json();
+      const result = await apiJson<{ data?: Member; message?: string }>(response);
       if (!response.ok) {
         throw new Error(result.message ?? "请求失败");
+      }
+      if (!result.data) {
+        throw new Error("接口返回数据异常，请稍后重试");
       }
 
       onLogin(result.data);

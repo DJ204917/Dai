@@ -45,7 +45,8 @@ export default function Auth({ onLogin }: AuthProps) {
 
     setStatus("loading");
     try {
-      const response = await apiFetch(`/api/auth/${mode === "login" ? "login" : "register"}`, {
+      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
+      const response = await apiFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ account, password })

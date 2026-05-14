@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { AppError } from "../middleware/errorHandler.js";
 import { createBooking, createOrder, getBookingById, getBookings, getCourses, getEquipment, getOrders, getServices, restoreBookingInventory, timeSlots, updateBooking } from "../data/store.js";
+import { asyncRoute } from "../middleware/asyncRoute.js";
 
 const router = Router();
 
@@ -64,8 +65,8 @@ function isActiveBooking(booking: { status: string }) {
   return booking.status !== "cancelled";
 }
 
-function assertPrivateDayAvailable(date: string, serviceId: string) {
-  const bookings = getBookings();
+async function assertPrivateDayAvailable(date: string, serviceId: string) {
+  const bookings = await getBookings();
   const activeBookingsOnDate = bookings.filter((booking) => booking.date === date && isActiveBooking(booking));
   const hasPrivateBooking = activeBookingsOnDate.some((booking) => booking.serviceId === "private");
 
@@ -78,9 +79,8 @@ function assertPrivateDayAvailable(date: string, serviceId: string) {
   }
 }
 
-function calculateAvailability(date: string, serviceId = "lane") {
-  const services = getServices();
-  const bookings = getBookings();
+async function calculateAvailability(date: string, serviceId = "lane") {
+  const [services, bookings] = await Promise.all([getServices(), getBookings()]);
   const service = services.find((item) => item.id === serviceId);
   if (!service) {
     throw new AppError(404, "服务不存在");
@@ -117,10 +117,8 @@ function calculateAvailability(date: string, serviceId = "lane") {
   });
 }
 
-function buildFeeItems(input: z.infer<typeof createBookingSchema>) {
-  const services = getServices();
-  const courses = getCourses();
-  const equipment = getEquipment();
+async function buildFeeItems(input: z.infer<typeof createBookingSchema>) {
+  const [services, courses, equipment] = await Promise.all([getServices(), getCourses(), getEquipment()]);
   const service = services.find((item) => item.id === input.serviceId);
   if (!service) {
     throw new AppError(404, "服务不存在");
@@ -174,7 +172,7 @@ function buildFeeItems(input: z.infer<typeof createBookingSchema>) {
   return feeItems;
 }
 
-function buildFeeItemsForBooking(booking: {
+async function buildFeeItemsForBooking(booking: {
   serviceId: "lane" | "course" | "private" | "rental";
   courseId?: string;
   people: number;
@@ -194,17 +192,17 @@ function buildFeeItemsForBooking(booking: {
   });
 }
 
-function assertSlotAvailable(date: string, slot: string, serviceId: string, people: number) {
-  assertPrivateDayAvailable(date, serviceId);
+async function assertSlotAvailable(date: string, slot: string, serviceId: string, people: number) {
+  await assertPrivateDayAvailable(date, serviceId);
 
-  const services = getServices();
+  const services = await getServices();
   const service = services.find((item) => item.id === serviceId);
   if (!service) {
     throw new AppError(404, "服务不存在");
   }
 
   const targetRange = parseTimeRange(slot);
-  const bookings = getBookings();
+  const bookings = await getBookings();
   const used = bookings
     .filter((booking) => {
       if (booking.date !== date || booking.serviceId !== service.id || booking.status === "cancelled") {
@@ -221,52 +219,53 @@ function assertSlotAvailable(date: string, slot: string, serviceId: string, peop
   return targetRange;
 }
 
-router.get("/", (req, res) => {
-  const bookings = getBookings();
+router.get("/", asyncRoute(async (req, res) => {
+  const bookings = await getBookings();
   const status = req.query.status ? String(req.query.status) : undefined;
   const date = req.query.date ? String(req.query.date) : undefined;
   const data = bookings.filter((booking) => (!status || booking.status === status) && (!date || booking.date === date));
   res.json({ data });
-});
+}));
 
-router.get("/availability", (req, res) => {
+router.get("/availability", asyncRoute(async (req, res) => {
   const date = String(req.query.date ?? "");
   const serviceId = String(req.query.serviceId ?? "lane");
   if (!date) {
     throw new AppError(400, "date 参数必填");
   }
-  res.json({ date, serviceId, data: calculateAvailability(date, serviceId) });
-});
+  res.json({ date, serviceId, data: await calculateAvailability(date, serviceId) });
+}));
 
-router.get("/:bookingId", (req, res) => {
-  const booking = getBookingById(req.params.bookingId);
+router.get("/:bookingId", asyncRoute(async (req, res) => {
+  const bookingId = String(req.params.bookingId);
+  const booking = await getBookingById(bookingId);
   if (!booking) {
     throw new AppError(404, "预约不存在");
   }
-  const orders = getOrders();
+  const orders = await getOrders();
   const order = orders.find((item) => item.bookingId === booking.id);
   res.json({ data: { booking, order } });
-});
+}));
 
-router.post("/", (req, res) => {
+router.post("/", asyncRoute(async (req, res) => {
   const input = createBookingSchema.parse(req.body);
-  assertPrivateDayAvailable(input.date, input.serviceId);
+  await assertPrivateDayAvailable(input.date, input.serviceId);
 
   if (input.serviceId !== "rental") {
-    const timeRange = assertSlotAvailable(input.date, input.slot, input.serviceId, input.people);
+    const timeRange = await assertSlotAvailable(input.date, input.slot, input.serviceId, input.people);
     input.hours = timeRange.hours;
   }
 
-  const feeItems = buildFeeItems(input);
+  const feeItems = await buildFeeItems(input);
   const amount = feeItems.reduce((sum, item) => sum + item.amount, 0);
 
-  const booking = createBooking({
+  const booking = await createBooking({
     ...input,
     status: "pending_payment",
     amount
   });
 
-  const order = createOrder({
+  const order = await createOrder({
     bookingId: booking.id,
     amount,
     status: "pending_payment",
@@ -274,11 +273,12 @@ router.post("/", (req, res) => {
   });
 
   res.status(201).json({ data: { booking, order } });
-});
+}));
 
-router.patch("/:bookingId", (req, res) => {
+router.patch("/:bookingId", asyncRoute(async (req, res) => {
+  const bookingId = String(req.params.bookingId);
   const input = updateBookingSchema.parse(req.body);
-  const booking = getBookingById(req.params.bookingId);
+  const booking = await getBookingById(bookingId);
   if (!booking) {
     throw new AppError(404, "预约不存在");
   }
@@ -291,11 +291,11 @@ router.patch("/:bookingId", (req, res) => {
   const nextPeople = input.people ?? booking.people;
   let nextHours = input.hours ?? booking.hours;
   if (booking.serviceId !== "rental" && (nextDate !== booking.date || nextSlot !== booking.slot || nextPeople !== booking.people)) {
-    const timeRange = assertSlotAvailable(nextDate, nextSlot, booking.serviceId, nextPeople);
+    const timeRange = await assertSlotAvailable(nextDate, nextSlot, booking.serviceId, nextPeople);
     nextHours = timeRange.hours;
   }
 
-  const updatedBooking = updateBooking(req.params.bookingId, {
+  const updatedBooking = await updateBooking(bookingId, {
     ...input,
     people: nextPeople,
     hours: nextHours
@@ -305,19 +305,20 @@ router.patch("/:bookingId", (req, res) => {
     throw new AppError(404, "预约不存在");
   }
 
-  const orders = getOrders();
+  const orders = await getOrders();
   const order = orders.find((item) => item.bookingId === updatedBooking.id);
   if (order && order.status === "pending_payment") {
-    const feeItems = buildFeeItemsForBooking(updatedBooking);
+    const feeItems = await buildFeeItemsForBooking(updatedBooking);
     const amount = feeItems.reduce((sum, item) => sum + item.amount, 0);
     // Note: In a real implementation, you'd update the order in the database too
   }
 
   res.json({ data: { booking: updatedBooking, order } });
-});
+}));
 
-router.post("/:bookingId/cancel", (req, res) => {
-  const booking = getBookingById(req.params.bookingId);
+router.post("/:bookingId/cancel", asyncRoute(async (req, res) => {
+  const bookingId = String(req.params.bookingId);
+  const booking = await getBookingById(bookingId);
   if (!booking) {
     throw new AppError(404, "预约不存在");
   }
@@ -325,14 +326,14 @@ router.post("/:bookingId/cancel", (req, res) => {
     throw new AppError(409, "预约已取消");
   }
 
-  const updatedBooking = updateBooking(req.params.bookingId, { status: "cancelled" });
+  const updatedBooking = await updateBooking(bookingId, { status: "cancelled" });
   if (!updatedBooking) {
     throw new AppError(404, "预约不存在");
   }
 
-  restoreBookingInventory(updatedBooking);
+  await restoreBookingInventory(updatedBooking);
 
-  const orders = getOrders();
+  const orders = await getOrders();
   const order = orders.find((item) => item.bookingId === updatedBooking.id);
   if (order) {
     // Note: In a real implementation, you'd update order status in database
@@ -345,6 +346,6 @@ router.post("/:bookingId/cancel", (req, res) => {
       refundRule: "开游前2小时可免费取消，已支付订单进入退款审核。"
     }
   });
-});
+}));
 
 export default router;

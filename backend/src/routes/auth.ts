@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { createMember, getMemberByAccount, updateMemberLastLogin } from "../data/store.js";
+import { asyncRoute } from "../middleware/asyncRoute.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
@@ -27,20 +28,20 @@ function publicMember(member: { id: string; account: string; createdAt: string; 
   };
 }
 
-router.post("/register", (req, res) => {
+router.post("/register", asyncRoute(async (req, res) => {
   const input = authSchema.parse(req.body);
-  const existing = getMemberByAccount(input.account);
+  const existing = await getMemberByAccount(input.account);
   if (existing) {
     throw new AppError(409, "账号已注册，请直接登录");
   }
 
-  const member = createMember(input.account, hashPassword(input.password));
+  const member = await createMember(input.account, hashPassword(input.password));
   res.status(201).json({ data: publicMember(member), message: "注册成功" });
-});
+}));
 
-router.post("/login", (req, res) => {
+router.post("/login", asyncRoute(async (req, res) => {
   const input = authSchema.parse(req.body);
-  const member = getMemberByAccount(input.account);
+  const member = await getMemberByAccount(input.account);
   if (!member) {
     throw new AppError(404, "此账号未注册请前往注册");
   }
@@ -48,8 +49,8 @@ router.post("/login", (req, res) => {
     throw new AppError(401, "密码错误");
   }
 
-  const updatedMember = updateMemberLastLogin(member.id) ?? member;
+  const updatedMember = await updateMemberLastLogin(member.id) ?? member;
   res.json({ data: publicMember(updatedMember), message: "登录成功" });
-});
+}));
 
 export default router;

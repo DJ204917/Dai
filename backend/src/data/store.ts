@@ -517,6 +517,33 @@ async function withPostgres<T>(handler: (client: Sql) => Promise<T>, fallback: (
   return handler(sql);
 }
 
+export async function getDataStoreStatus() {
+  if (!sql) {
+    return {
+      provider: "json",
+      databaseConfigured: false,
+      ok: true
+    };
+  }
+
+  try {
+    await ensurePostgresReady(sql);
+    await sql`SELECT 1`;
+    return {
+      provider: "postgres",
+      databaseConfigured: true,
+      ok: true
+    };
+  } catch (error) {
+    return {
+      provider: "postgres",
+      databaseConfigured: true,
+      ok: false,
+      message: error instanceof Error ? error.message : "数据库连接失败"
+    };
+  }
+}
+
 function countRentalIds(rentalIds: string[]): Record<string, number> {
   return rentalIds.reduce<Record<string, number>>((counts, id) => {
     counts[id] = (counts[id] || 0) + 1;

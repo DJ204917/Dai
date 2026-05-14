@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Router } from "express";
 import { z } from "zod";
-import { createMember, getMemberByAccount, updateMemberLastLogin } from "../data/store.js";
+import { createMember, getDataStoreStatus, getMemberByAccount, updateMemberLastLogin } from "../data/store.js";
 import { asyncRoute } from "../middleware/asyncRoute.js";
 import { AppError } from "../middleware/errorHandler.js";
 
@@ -27,6 +27,12 @@ function publicMember(member: { id: string; account: string; createdAt: string; 
     lastLoginAt: member.lastLoginAt
   };
 }
+
+router.get("/status", asyncRoute(async (_req, res) => {
+  res.json({
+    data: await getDataStoreStatus()
+  });
+}));
 
 router.post("/register", asyncRoute(async (req, res) => {
   const input = authSchema.parse(req.body);

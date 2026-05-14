@@ -14,6 +14,14 @@ interface AuthProps {
   onLogin: (member: Member) => void;
 }
 
+interface AuthResponse {
+  data?: Member;
+  message?: string;
+  error?: {
+    message?: string;
+  };
+}
+
 const accountRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,16}$/;
 const passwordRegex = /^\d{6}$/;
 
@@ -45,17 +53,34 @@ export default function Auth({ onLogin }: AuthProps) {
 
     setStatus("loading");
     try {
-      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account, password })
-      });
-      const result = await apiJson<{ data?: Member; message?: string }>(response);
-      if (!response.ok) {
-        throw new Error(result.message ?? "请求失败");
+      const endpoints = mode === "login"
+        ? ["/api/auth/login", "/api/login"]
+        : ["/api/auth/register", "/api/register"];
+      let result: AuthResponse | undefined;
+
+      for (const [index, endpoint] of endpoints.entries()) {
+        try {
+          const response = await apiFetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account, password })
+          });
+          result = await apiJson<AuthResponse>(response);
+          if (response.status === 404 && index < endpoints.length - 1) {
+            continue;
+          }
+          if (!response.ok) {
+            throw new Error(result.message ?? result.error?.message ?? `请求失败（${response.status}）`);
+          }
+          break;
+        } catch (error) {
+          if (index < endpoints.length - 1 && error instanceof Error && /404|不存在|not found/i.test(error.message)) {
+            continue;
+          }
+          throw error;
+        }
       }
-      if (!result.data) {
+      if (!result?.data) {
         throw new Error("接口返回数据异常，请稍后重试");
       }
 

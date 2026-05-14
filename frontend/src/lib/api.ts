@@ -1,4 +1,23 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, "") ?? "";
+function normalizeApiBaseUrl(value?: string) {
+  const raw = value?.trim().replace(/\/+$/, "") ?? "";
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    const url = new URL(raw);
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      url.pathname = "";
+      url.search = "";
+      url.hash = "";
+    }
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return raw.replace(/\/api(?:\/.*)?$/, "");
+  }
+}
+
+const apiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export function apiUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

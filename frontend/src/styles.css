@@ -41,6 +41,8 @@ a {
   background: rgba(245, 247, 244, 0.92);
   border-bottom: 1px solid #dce5dd;
   backdrop-filter: blur(16px);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  will-change: transform;
 }
 
 .admin-shell {
@@ -987,6 +989,19 @@ select {
     repeating-linear-gradient(45deg, #deebe3, #deebe3 12px, #eef5ee 12px, #eef5ee 24px);
 }
 
+.navigation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.navigation-actions a,
+.navigation-actions button {
+  min-width: 132px;
+  text-decoration: none;
+}
+
 .auth-page {
   max-width: 720px;
 }
@@ -1096,6 +1111,11 @@ select {
 @media (max-width: 980px) {
   .site-header {
     flex-wrap: wrap;
+  }
+
+  .site-header.site-header-hidden {
+    transform: translateY(calc(-100% - 2px));
+    box-shadow: none;
   }
 
   .hotline {

@@ -1,11 +1,10 @@
-import { Mail, MapPinned, Navigation, Phone } from "lucide-react";
+import { ExternalLink, Mail, MapPinned, Navigation, Phone } from "lucide-react";
 
-const xipuNavigationUrl = "https://uri.amap.com/navigation?to=103.976356,30.753039,%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99&mode=walk&policy=1&src=daiai-swim";
-const xipuMobileNavigationUrl = "geo:30.753039,103.976356?q=%E5%9B%9B%E5%B7%9D%E7%9C%81%E6%88%90%E9%83%BD%E5%B8%82%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99";
+const amapNavigationUrl = "https://ditu.amap.com/search?query=%E5%9B%9B%E5%B7%9D%E7%9C%81%E6%88%90%E9%83%BD%E5%B8%82%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99";
+const tencentNavigationUrl = "https://map.qq.com/m/search/searchword=%E5%9B%9B%E5%B7%9D%E7%9C%81%E6%88%90%E9%83%BD%E5%B8%82%E7%8A%80%E6%B5%A6%E5%9C%B0%E9%93%81%E7%AB%99";
 
-function openXipuNavigation() {
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  window.location.href = isMobile ? xipuMobileNavigationUrl : xipuNavigationUrl;
+function openMapWebsite(url: string) {
+  window.location.assign(url);
 }
 
 export default function Contact() {
@@ -24,10 +23,15 @@ export default function Contact() {
         </section>
         <section className="map-placeholder navigation-panel">
           <strong>四川省成都市犀浦地铁站</strong>
-          <span>手机端会打开系统导航应用选择页，选择高德、百度或其他地图后即可导航。</span>
-          <button className="primary-button" type="button" onClick={openXipuNavigation}>
-            <Navigation size={18} /> 打开导航
-          </button>
+          <span>请选择地图官网打开路线，进入后可按页面提示继续导航。</span>
+          <div className="navigation-actions" aria-label="选择地图官网">
+            <button className="primary-button" type="button" onClick={() => openMapWebsite(amapNavigationUrl)}>
+              <Navigation size={18} /> 高德地图
+            </button>
+            <button className="secondary-button" type="button" onClick={() => openMapWebsite(tencentNavigationUrl)}>
+              <ExternalLink size={18} /> 腾讯地图
+            </button>
+          </div>
         </section>
       </div>
     </div>

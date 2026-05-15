@@ -86,30 +86,58 @@ const coursePlanLabels: Record<string, string> = {
 };
 
 const EQUIPMENT_DEPOSIT = 20;
+const OPENING_MINUTES = 8 * 60;
+const CLOSING_MINUTES = 22 * 60;
+const SLOT_STEP_MINUTES = 30;
+const DEFAULT_BOOKING_MINUTES = 60;
+const MAX_START_MINUTES = CLOSING_MINUTES - DEFAULT_BOOKING_MINUTES;
 const halfHourTimeOptions = Array.from({ length: 29 }, (_, index) => {
-  const minutes = 8 * 60 + index * 30;
-  const hour = String(Math.floor(minutes / 60)).padStart(2, "0");
-  const minute = String(minutes % 60).padStart(2, "0");
-  return `${hour}:${minute}`;
+  return formatMinutesAsTime(OPENING_MINUTES + index * SLOT_STEP_MINUTES);
 });
 
 function buildDateOptions(selectedDate: string) {
-  const start = new Date(`${getLocalDateValue()}T00:00:00`);
-  const dates = Array.from({ length: 30 }, (_, index) => {
-    const next = new Date(start);
-    next.setDate(start.getDate() + index);
-    return next.toISOString().slice(0, 10);
-  });
-  return dates.includes(selectedDate) ? dates : dates;
+  const today = getBeijingDateValue();
+  const dates = Array.from({ length: 30 }, (_, index) => addDaysToDateValue(today, index));
+  return dates.includes(selectedDate) ? dates : [selectedDate, ...dates].sort();
 }
 
 function getLocalDateValue(date = new Date()) {
-  const timezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+  return getBeijingDateValue(date);
+}
+
+function getBeijingParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const valueOf = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  return {
+    dateValue: `${valueOf("year")}-${valueOf("month")}-${valueOf("day")}`,
+    minutes: Number(valueOf("hour")) * 60 + Number(valueOf("minute"))
+  };
+}
+
+function getBeijingDateValue(date = new Date()) {
+  return getBeijingParts(date).dateValue;
+}
+
+function getBeijingMinuteValue(date = new Date()) {
+  return getBeijingParts(date).minutes;
+}
+
+function addDaysToDateValue(dateValue: string, days: number) {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return next.toISOString().slice(0, 10);
 }
 
 function normalizeBookableDate(value: string | null) {
-  const today = getLocalDateValue();
+  const today = getBeijingDateValue();
   return value && value >= today ? value : today;
 }
 
@@ -131,32 +159,76 @@ function parseSlot(value: string) {
   };
 }
 
-function normalizeHalfHourTime(value: string | undefined, fallback: string) {
+function formatMinutesAsTime(totalMinutes: number) {
+  const hour = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minute = String(totalMinutes % 60).padStart(2, "0");
+  return `${hour}:${minute}`;
+}
+
+function parseTimeMinutes(value: string | undefined) {
   if (!value) {
-    return fallback;
+    return null;
   }
 
   const [hour, minute] = value.split(":").map(Number);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+}
+
+function roundUpToHalfHour(minutes: number) {
+  return Math.ceil(minutes / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES;
+}
+
+function normalizeHalfHourTime(value: string | undefined, fallback: string) {
+  const timeMinutes = parseTimeMinutes(value);
+  if (timeMinutes === null) {
     return fallback;
   }
 
-  const minMinutes = 8 * 60;
-  const maxMinutes = 22 * 60;
-  const roundedMinutes = Math.ceil((hour * 60 + minute) / 30) * 30;
-  const boundedMinutes = Math.min(Math.max(roundedMinutes, minMinutes), maxMinutes);
-  const normalizedHour = String(Math.floor(boundedMinutes / 60)).padStart(2, "0");
-  const normalizedMinute = String(boundedMinutes % 60).padStart(2, "0");
-  return `${normalizedHour}:${normalizedMinute}`;
+  const roundedMinutes = roundUpToHalfHour(timeMinutes);
+  const boundedMinutes = Math.min(Math.max(roundedMinutes, OPENING_MINUTES), CLOSING_MINUTES);
+  return formatMinutesAsTime(boundedMinutes);
+}
+
+function getMinimumStartMinutes(dateValue: string) {
+  if (dateValue !== getBeijingDateValue()) {
+    return OPENING_MINUTES;
+  }
+
+  const nearestBeijingSlot = roundUpToHalfHour(getBeijingMinuteValue());
+  return Math.min(Math.max(nearestBeijingSlot, OPENING_MINUTES), MAX_START_MINUTES);
+}
+
+function normalizeStartTimeForDate(value: string | undefined, dateValue: string) {
+  const parsedMinutes = parseTimeMinutes(value) ?? OPENING_MINUTES;
+  const minStartMinutes = getMinimumStartMinutes(dateValue);
+  const roundedMinutes = roundUpToHalfHour(parsedMinutes);
+  const boundedMinutes = Math.min(Math.max(roundedMinutes, minStartMinutes), MAX_START_MINUTES);
+  return formatMinutesAsTime(boundedMinutes);
+}
+
+function defaultEndTimeForStart(startTime: string) {
+  const startMinutes = parseTimeMinutes(startTime) ?? OPENING_MINUTES;
+  return formatMinutesAsTime(Math.min(startMinutes + DEFAULT_BOOKING_MINUTES, CLOSING_MINUTES));
+}
+
+function normalizeEndTimeForStart(value: string | undefined, startTime: string) {
+  const startMinutes = parseTimeMinutes(startTime) ?? OPENING_MINUTES;
+  const minEndMinutes = Math.min(startMinutes + DEFAULT_BOOKING_MINUTES, CLOSING_MINUTES);
+  const parsedMinutes = parseTimeMinutes(value) ?? minEndMinutes;
+  const roundedMinutes = roundUpToHalfHour(parsedMinutes);
+  const boundedMinutes = Math.min(Math.max(roundedMinutes, minEndMinutes), CLOSING_MINUTES);
+  return formatMinutesAsTime(boundedMinutes);
 }
 
 function getTimeHours(startTime: string, endTime: string) {
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
-  const start = startHour * 60 + startMinute;
-  const end = endHour * 60 + endMinute;
+  const start = parseTimeMinutes(startTime) ?? 0;
+  const end = parseTimeMinutes(endTime) ?? 0;
   const minutes = end - start;
-  return minutes > 0 ? Math.ceil(minutes / 30) / 2 : 0;
+  return minutes > 0 ? Math.ceil(minutes / SLOT_STEP_MINUTES) / 2 : 0;
 }
 
 function formatHours(value: number) {
@@ -174,7 +246,10 @@ export default function Payment() {
   const itemId = searchParams.get("item");
   const existingOrderId = searchParams.get("orderId");
   const initialSlot = searchParams.get("slot") ?? "09:00-10:00";
+  const initialDate = normalizeBookableDate(searchParams.get("date"));
   const parsedInitialSlot = parseSlot(initialSlot);
+  const initialStartTime = normalizeStartTimeForDate(parsedInitialSlot.startTime, initialDate);
+  const initialEndTime = normalizeEndTimeForStart(parsedInitialSlot.endTime, initialStartTime);
   const rentalIdsParam = searchParams.get("rentalIds") ?? searchParams.get("rentals");
   const rentalQuantities: Record<string, number> = {};
   const rentalIds: string[] = [];
@@ -208,9 +283,9 @@ export default function Payment() {
 
   const [contactName, setContactName] = useState("张三");
   const [phone, setPhone] = useState("13800138000");
-  const [date, setDate] = useState(normalizeBookableDate(searchParams.get("date")));
-  const [startTime, setStartTime] = useState(parsedInitialSlot.startTime);
-  const [endTime, setEndTime] = useState(parsedInitialSlot.endTime);
+  const [date, setDate] = useState(initialDate);
+  const [startTime, setStartTime] = useState(initialStartTime);
+  const [endTime, setEndTime] = useState(initialEndTime);
   const [people, setPeople] = useState(Number(searchParams.get("people") ?? 1));
   const [quantity, setQuantity] = useState(Number(searchParams.get("quantity") ?? 1));
   const [method, setMethod] = useState<PaymentMethod>("wechat");
@@ -297,15 +372,15 @@ export default function Payment() {
   }, [existingOrderId, loading]);
 
   useEffect(() => {
-    const normalizedStart = normalizeHalfHourTime(startTime, "09:00");
-    const normalizedEnd = normalizeHalfHourTime(endTime, "10:00");
+    const normalizedStart = normalizeStartTimeForDate(startTime, date);
+    const normalizedEnd = normalizeEndTimeForStart(endTime, normalizedStart);
     if (normalizedStart !== startTime) {
       setStartTime(normalizedStart);
     }
     if (normalizedEnd !== endTime) {
       setEndTime(normalizedEnd);
     }
-  }, [startTime, endTime]);
+  }, [date, startTime, endTime]);
 
   useEffect(() => {
     if (hasValidTimeRange && status === "error" && timeValidationPattern.test(message)) {
@@ -315,6 +390,34 @@ export default function Payment() {
   }, [date, startTime, endTime, hasValidTimeRange, status, message]);
 
   const dateOptions = useMemo(() => buildDateOptions(date), [date]);
+  const startTimeOptions = useMemo(() => {
+    const minStartMinutes = getMinimumStartMinutes(date);
+    return halfHourTimeOptions.filter((item) => {
+      const minutes = parseTimeMinutes(item) ?? OPENING_MINUTES;
+      return minutes >= minStartMinutes && minutes <= MAX_START_MINUTES;
+    });
+  }, [date]);
+  const endTimeOptions = useMemo(() => {
+    const startMinutes = parseTimeMinutes(startTime) ?? OPENING_MINUTES;
+    const minEndMinutes = Math.min(startMinutes + DEFAULT_BOOKING_MINUTES, CLOSING_MINUTES);
+    return halfHourTimeOptions.filter((item) => {
+      const minutes = parseTimeMinutes(item) ?? OPENING_MINUTES;
+      return minutes >= minEndMinutes && minutes <= CLOSING_MINUTES;
+    });
+  }, [startTime]);
+
+  const handleDateChange = (value: string) => {
+    const nextStartTime = normalizeStartTimeForDate(startTime, value);
+    setDate(value);
+    setStartTime(nextStartTime);
+    setEndTime(defaultEndTimeForStart(nextStartTime));
+  };
+
+  const handleStartTimeChange = (value: string) => {
+    const nextStartTime = normalizeStartTimeForDate(value, date);
+    setStartTime(nextStartTime);
+    setEndTime(defaultEndTimeForStart(nextStartTime));
+  };
 
   const total = useMemo(() => {
     if (existingBooking) {
@@ -600,20 +703,20 @@ export default function Payment() {
               <>
                 <label>
                   日期
-                  <select value={date} onChange={(event) => setDate(event.target.value)}>
+                  <select value={date} onChange={(event) => handleDateChange(event.target.value)}>
                     {dateOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>
                   开始时间
-                  <select value={startTime} onChange={(event) => setStartTime(event.target.value)}>
-                    {halfHourTimeOptions.map((item) => <option key={item}>{item}</option>)}
+                  <select value={startTime} onChange={(event) => handleStartTimeChange(event.target.value)}>
+                    {startTimeOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>
                   结束时间
                   <select value={endTime} onChange={(event) => setEndTime(event.target.value)}>
-                    {halfHourTimeOptions.map((item) => <option key={item}>{item}</option>)}
+                    {endTimeOptions.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 </label>
                 <label>

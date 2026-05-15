@@ -29,6 +29,7 @@ interface Member {
 export default function App() {
   const location = useLocation();
   const [member, setMember] = useState<Member | null>(null);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin");
 
   useEffect(() => {
@@ -37,6 +38,36 @@ export default function App() {
       setMember(JSON.parse(savedMember));
     }
   }, []);
+
+  useEffect(() => {
+    if (isAdminRoute) {
+      setIsHeaderHidden(false);
+      return;
+    }
+
+    let lastScrollY = window.scrollY;
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollY;
+
+      if (currentScrollY < 24) {
+        setIsHeaderHidden(false);
+      } else if (delta > 8) {
+        setIsHeaderHidden(true);
+      } else if (delta < -6) {
+        setIsHeaderHidden(false);
+      }
+
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isAdminRoute]);
+
+  useEffect(() => {
+    setIsHeaderHidden(false);
+  }, [location.pathname]);
 
   const handleLogin = (nextMember: Member) => {
     setMember(nextMember);
@@ -65,7 +96,7 @@ export default function App() {
           </Link>
         </header>
       ) : (
-        <header className="site-header">
+        <header className={isHeaderHidden ? "site-header site-header-hidden" : "site-header"}>
           <NavLink to="/" className="brand" aria-label="返回首页">
             <span className="brand-mark"><Waves size={22} /></span>
             <span>迪爱泳馆</span>
